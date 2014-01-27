@@ -1,0 +1,16 @@
+digraph G {
+    main
+
+    visomono_process [label="VisualOdometryMono::process"]
+
+    reconstruction_update [label="Reconstruction::update"]
+
+    main -> visomono_process
+    main -> reconstruction_update
+
+    visomono_process -> matcher_push
+    visomono_process -> matcher_match
+    visomono_process -> matcher_bucket
+    visomono_process -> update_motion
+
+}

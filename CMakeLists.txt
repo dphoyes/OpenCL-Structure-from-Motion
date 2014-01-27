@@ -18,6 +18,15 @@ FILE(GLOB LIBVISO2_SRC_FILES "src/*.cpp")
 set(CMAKE_BUILD_TYPE Release)
 
 # demo program
-add_executable(viso2 ${LIBVISO2_SRC_FILES})
+add_library(viso2 ${LIBVISO2_SRC_FILES})
 target_link_libraries (viso2 png)
+
+
+file(GLOB srcs "demo/*.cpp")
+foreach(src_file ${srcs})
+    get_filename_component(demo_name ${src_file} NAME_WE)
+    message(${src_file})
+    add_executable(${demo_name} ${src_file})
+    target_link_libraries(${demo_name} viso2)
+endforeach(src_file ${srcs})
 
