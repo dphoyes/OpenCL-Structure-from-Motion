@@ -126,16 +126,20 @@ void Reconstruction::update (vector<Matcher::p_match> p_matched,Matrix Tr,int32_
         
         // try to init point from first and last track frame
         if (initPoint(*t,p)) {
-          if (pointType(*t,p)>=point_type)
-            if (refinePoint(*t,p))
-              if(pointDistance(*t,p)<max_dist && rayAngle(*t,p)>min_angle)
-                points.push_back(p);
+            if (pointType(*t,p)>=point_type) {
+                if (refinePoint(*t,p)) {
+//                    cout << "Point distance: " << pointDistance(*t,p) << " Ray angle: " << rayAngle(*t,p) << endl;
+                    if(pointDistance(*t,p)<max_dist && rayAngle(*t,p)>min_angle) {
+                        points.push_back(p);
+                    }
+                }
+            }
         }
       }
     }
   }
   
-  //cout << "P: " << points.size() << endl;
+  cout << "T: " << tracks.size() << endl;
   //testJacobian();
   
   delete track_idx;
