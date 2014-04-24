@@ -61,7 +61,7 @@ public:
   //                     when small/no motions are observed to obtain Tr_delta wrt
   //                     an older coordinate system / time step than the previous one.
   // output: returns false if motion too small or an error occured
-  bool process (uint8_t *I,int32_t* dims,bool replace=false);
+  bool process (uint8_t *I,uint32_t* dims,bool replace=false);
 
 private:
 
@@ -77,10 +77,11 @@ private:
   void                 fundamentalMatrix (const std::vector<Matcher::p_match> &p_matched,const std::vector<int32_t> &active,Matrix &F);
   void                 EtoRt(Matrix &E,Matrix &K,std::vector<Matcher::p_match> &p_matched,Matrix &X,Matrix &R,Matrix &t);
   int32_t              triangulateChieral (std::vector<Matcher::p_match> &p_matched,Matrix &K,Matrix &R,Matrix &t,Matrix &X);
-  std::vector<int32_t> getInlier (std::vector<Matcher::p_match> &p_matched,Matrix &F);
+  virtual std::vector<int32_t> getInlier (std::vector<Matcher::p_match> &p_matched,Matrix &F);
   
+protected:
   // parameters
-  parameters param;  
+  const parameters param;
 };
 
 #endif // VISO_MONO_H

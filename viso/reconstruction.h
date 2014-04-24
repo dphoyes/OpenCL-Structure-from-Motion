@@ -66,7 +66,7 @@ public:
   void update (std::vector<Matcher::p_match> p_matched,Matrix Tr,int32_t point_type=1,int32_t min_track_length=2,double max_dist=30,double min_angle=2);
   
   // return currently computed 3d points (finished tracks)
-  std::vector<point3d> getPoints() { return points; }
+  const std::vector<point3d> &getPoints() { return points; }
 
 private:
   

@@ -105,8 +105,8 @@ void mexFunction (int nlhs,mxArray *plhs[],int nrhs,const mxArray *prhs[]) {
       mexErrMsgTxt("1 outputs required: Tr (transformation from previous to current frame.");  
 
     // check for proper argument types and sizes
-    if (!mxIsUint8(prhs[1]) || mxGetNumberOfDimensions(prhs[1])!=2)
-      mexErrMsgTxt("Input I (image) must be a uint8 image.");
+//     if (!mxIsUint8(prhs[1]) || mxGetNumberOfDimensions(prhs[1])!=2)
+//       mexErrMsgTxt("Input I (image) must be a uint8 image.");
     if (nrhs==2+1 && !mxIsDouble(prhs[2]))
       mexErrMsgTxt("Input replace must be a double scalar (0/1).");
     

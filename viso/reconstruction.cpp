@@ -22,6 +22,12 @@ Street, Fifth Floor, Boston, MA 02110-1301, USA
 #include "reconstruction.h"
 #include <fstream>
 
+#define GLM_FORCE_RADIANS
+#define GLM_SWIZZLE
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/constants.hpp>
+
 using namespace std;
 
 Reconstruction::Reconstruction () {
@@ -49,12 +55,38 @@ void Reconstruction::setCalibration (FLOAT f,FLOAT cu,FLOAT cv) {
 
 void Reconstruction::update (vector<Matcher::p_match> p_matched,Matrix Tr,int32_t point_type,int32_t min_track_length,double max_dist,double min_angle) {
   
+    {
+        glm::mat4 movement;
+        for (int i=0; i<4; i++)
+            for (int j=0; j<4; j++)
+            {
+                movement[j][i] = Tr.val[i][j];
+            }
+
+
+        for (point3d &p : points)
+        {
+            glm::vec4 translated = movement * glm::vec4(p.x, p.y, p.z, 1);
+            float w = translated.w;
+            p.x = translated.x / w;
+            p.y = translated.y / w;
+            p.z = translated.z / w;
+        }
+    }
+
   // update transformation vector
   Matrix Tr_total_curr;
   if (Tr_total.size()==0) Tr_total_curr = Matrix::inv(Tr);
   else                    Tr_total_curr = Tr_total.back()*Matrix::inv(Tr);
   Tr_total.push_back(Tr_total_curr);
   Tr_inv_total.push_back(Matrix::inv(Tr_total_curr));
+
+  glm::mat4 total_movement;
+  for (int i=0; i<4; i++)
+      for (int j=0; j<4; j++)
+      {
+          total_movement[j][i] = Tr_inv_total.back().val[i][j];
+      }
   
   // update projection vector
   Matrix P_total_curr = K*Matrix::inv(Tr_total_curr).getMat(0,0,2,3);
@@ -130,6 +162,11 @@ void Reconstruction::update (vector<Matcher::p_match> p_matched,Matrix Tr,int32_
                 if (refinePoint(*t,p)) {
 //                    cout << "Point distance: " << pointDistance(*t,p) << " Ray angle: " << rayAngle(*t,p) << endl;
                     if(pointDistance(*t,p)<max_dist && rayAngle(*t,p)>min_angle) {
+                        glm::vec4 translated = total_movement * glm::vec4(p.x, p.y, p.z, 1);
+                        float w = translated.w;
+                        p.x = translated.x / w;
+                        p.y = translated.y / w;
+                        p.z = translated.z / w;
                         points.push_back(p);
                     }
                 }
@@ -141,7 +178,7 @@ void Reconstruction::update (vector<Matcher::p_match> p_matched,Matrix Tr,int32_
   
   cout << "T: " << tracks.size() << endl;
   //testJacobian();
-  
+
   delete track_idx;
 }
 

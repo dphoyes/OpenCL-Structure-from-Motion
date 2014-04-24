@@ -2,9 +2,8 @@
 disp('===========================');
 clear all; close all; dbstop error;
 
-% parameter settings (for an example, please download
-% sequence '2010_03_09_drive_0019' from www.cvlibs.net)
-img_dir     = '/media/personal/Devel/libviso2/2010_03_09_drive_0019';
+% parameter settings
+img_dir     = '/home/dphoyes/FYP/videos_inputs/render2/';
 param.f      = 645.2;
 param.cu     = 635.9;
 param.cv     = 194.1;
@@ -32,7 +31,7 @@ for frame=first_frame:last_frame
   k = frame-first_frame+1;
   
   % read current images
-  I = imread([img_dir '/I1_' num2str(frame,'%06d') '.png']);
+  I = imread([img_dir num2str(frame,'%04d') '.png']);
 
   % compute and accumulate egomotion
   Tr = visualOdometryMonoMex('process',I,replace);

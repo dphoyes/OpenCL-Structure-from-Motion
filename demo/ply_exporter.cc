@@ -1,4 +1,4 @@
-#include "ply_exporter.h"
+#include "ply_exporter.hh"
 
 int export_ply(const std::vector<Reconstruction::point3d> &points, const std::string &filename)
 {

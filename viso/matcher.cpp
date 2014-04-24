@@ -92,7 +92,7 @@ Matcher::~Matcher() {
   if (I2c_dv_full)  _mm_free(I2c_dv_full);
 }
 
-void Matcher::pushBack (uint8_t *I1,uint8_t* I2,int32_t* dims,const bool replace) {
+void Matcher::pushBack (uint8_t *I1,uint8_t* I2,uint32_t* dims,const bool replace) {
 
   // image dimensions
   int32_t width  = dims[0];

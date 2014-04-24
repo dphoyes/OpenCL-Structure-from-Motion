@@ -30,7 +30,7 @@ VisualOdometryStereo::VisualOdometryStereo (parameters param) : param(param), Vi
 VisualOdometryStereo::~VisualOdometryStereo() {
 }
 
-bool VisualOdometryStereo::process (uint8_t *I1,uint8_t *I2,int32_t* dims,bool replace) {
+bool VisualOdometryStereo::process (uint8_t *I1,uint8_t *I2,uint32_t* dims,bool replace) {
   matcher->pushBack(I1,I2,dims,replace);
   if (Tr_valid) matcher->matchFeatures(2,&Tr_delta);
   else          matcher->matchFeatures(2);

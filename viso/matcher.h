@@ -108,13 +108,13 @@ public:
   //                         the input images, otherwise the current image is first copied
   //                         to the previous image (ring buffer functionality, descriptors need
   //                         to be computed only once)    
-  void pushBack (uint8_t *I1,uint8_t* I2,int32_t* dims,const bool replace);
+  void pushBack (uint8_t *I1,uint8_t* I2,uint32_t* dims,const bool replace);
   
   // computes features from a single image and pushes it back to a ringbuffer,
   // which interally stores the features of the current and previous image pair
   // use this function for flow computation
   // parameter description see above
-  void pushBack (uint8_t *I1,int32_t* dims,const bool replace) { pushBack(I1,0,dims,replace); }
+  void pushBack (uint8_t *I1,uint32_t* dims,const bool replace) { pushBack(I1,0,dims,replace); }
 
   // match features currently stored in ring buffer (current and previous frame)
   // input: method ... 0 = flow, 1 = stereo, 2 = quad matching
