@@ -1,3 +1,4 @@
 *.autosave
 *.mexa64
 graph/*.png
+CMakeLists.txt.user

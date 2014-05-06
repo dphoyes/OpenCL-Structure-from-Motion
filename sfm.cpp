@@ -40,7 +40,8 @@ using namespace std;
 struct cmd_params_t
 {
     VisualOdometryMono::parameters viso;
-    string dir;
+    string in_dir;
+    string out_file;
     unsigned n_frames = 0;
     bool use_gui = false;
     bool use_opencl = false;
@@ -50,9 +51,8 @@ cmd_params_t getParams(int argc, char** argv)
 {
     cmd_params_t param;
 
-
     int optFlag;
-    while((optFlag = getopt (argc, argv, "f:u:v:h:p:gcn:")) != -1)
+    while((optFlag = getopt (argc, argv, "f:u:v:h:p:gcn:o:")) != -1)
     {
         float fval = optarg != nullptr ? atof(optarg) : 0;
         float ival = optarg != nullptr ? atoi(optarg) : 0;
@@ -82,6 +82,9 @@ cmd_params_t getParams(int argc, char** argv)
         case 'n':
             param.n_frames = ival; // number of frames to process
             break;
+        case 'o':
+            param.out_file = optarg; // output directory
+            break;
         default:
             abort ();
         }
@@ -93,9 +96,10 @@ cmd_params_t getParams(int argc, char** argv)
         cerr << "Specify image directory" << endl;
         exit(1);
     }
-    param.dir = argv[optind];
+    param.in_dir = argv[optind];
 
-    cout << "Directory: " << param.dir << "\n"
+    cout << "Input: " << param.in_dir << "\n"
+         << "Output: " << param.out_file << "\n"
          << "n frames: " << param.n_frames << "\n"
          << "use gui: " << (param.use_gui ? "yes" : "no") << "\n"
          << "f: " << param.viso.calib.f << " pixels \n"
@@ -112,7 +116,7 @@ int main (int argc, char** argv)
 {
     auto param = getParams(argc, argv);
 
-    ImageSequenceLoader video(param.dir);
+    ImageSequenceLoader video(param.in_dir);
     StructureFromMotion sfm(param.viso, video.getDims(), param.use_opencl);
 
     std::unique_ptr<PointCloudViewerInterface> gui;
@@ -137,7 +141,10 @@ int main (int argc, char** argv)
     cout << "Total time: " << time_seconds << " s" << endl;
     cout << "FPS: " << fps << endl;
 
-    export_ply(sfm.getPoints(), param.dir + "/viso_cloud.ply");
+    if (!param.out_file.empty())
+    {
+        export_ply(sfm.getPoints(), param.out_file);
+    }
 
     cout << "Demo complete!" << endl;
     gui->waitClose();
