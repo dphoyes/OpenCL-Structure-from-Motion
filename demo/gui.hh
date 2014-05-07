@@ -1,16 +1,6 @@
 #ifndef GUI_H__
 #define GUI_H__
 
-#define ENABLE_SFM_GUI
-
-#ifdef ENABLE_SFM_GUI
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <GL/glew.h>
-#include <SFML/Graphics.hpp>
-#endif
-
 #include <reconstruction.h>
 
 class PointCloudViewerInterface
@@ -29,9 +19,15 @@ public:
     void waitClose() override {}
 };
 
-#ifndef ENABLE_SFM_GUI
+#ifdef __arm__
 typedef NoPointCloudViewer PointCloudViewer;
 #else
+
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <GL/glew.h>
+#include <SFML/Graphics.hpp>
 
 class PointCloudViewer: public PointCloudViewerInterface
 {

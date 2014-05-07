@@ -27,9 +27,14 @@ Street, Fifth Floor, Boston, MA 02110-1301, USA
 #include <string.h>
 #include <iostream>
 #include <math.h>
-#include <emmintrin.h>
 #include <algorithm>
 #include <vector>
+
+#if defined(__ARM_NEON__)
+#include "sse_to_neon.hpp"
+#else
+#include <emmintrin.h>
+#endif
 
 #include "matrix.h"
 

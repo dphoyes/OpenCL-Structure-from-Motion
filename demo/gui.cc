@@ -1,6 +1,6 @@
 #include "gui.hh"
 
-#ifdef ENABLE_SFM_GUI
+#ifndef __arm__
 
 #include <iostream>
 #include <fstream>
