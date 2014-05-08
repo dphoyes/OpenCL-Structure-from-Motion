@@ -39,9 +39,9 @@ public:
 
         // convert input images to uint8_t buffer
         int32_t k=0;
-        for (int32_t v=0; v<height; v++)
+        for (uint32_t v=0; v<height; v++)
         {
-            for (int32_t u=0; u<width; u++)
+            for (uint32_t u=0; u<width; u++)
             {
                 img_data[k] = img.get_pixel(u,v);
                 k++;

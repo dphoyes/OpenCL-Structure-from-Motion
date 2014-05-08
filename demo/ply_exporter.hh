@@ -7,6 +7,6 @@
 #include <fstream>
 #include <reconstruction.h>
 
-int export_ply(const std::vector<Reconstruction::point3d> &points, const std::string &filename);
+int export_ply(const std::vector<Point3d> &points, const std::string &filename);
 
 #endif // PLY_EXPORTER_H

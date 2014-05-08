@@ -104,7 +104,7 @@ int main (int argc, char** argv)
 
     auto t0 = chrono::high_resolution_clock::now();
 
-    for (int32_t i=0; i<param.n_frames; i++)
+    for (unsigned i=0; i<param.n_frames; i++)
     {
         uint8_t* img_data = video.getFrame(i);
         cout << "Processing: Frame: " << i;

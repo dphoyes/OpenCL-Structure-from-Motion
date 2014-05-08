@@ -31,8 +31,18 @@ static FLOAT maxarg1,maxarg2;
 static int32_t iminarg1,iminarg2;
 #define IMIN(a,b) (iminarg1=(a),iminarg2=(b),(iminarg1) < (iminarg2) ? (iminarg1) : (iminarg2))
 
-
 using namespace std;
+
+
+Point3d affineTransform(const Matrix &M, const Point3d &p)
+{
+    return Point3d (
+                p.x*M.val[0][0] + p.y*M.val[0][1] + p.z*M.val[0][2] + M.val[0][3],
+                p.x*M.val[1][0] + p.y*M.val[1][1] + p.z*M.val[1][2] + M.val[1][3],
+                p.x*M.val[2][0] + p.y*M.val[2][1] + p.z*M.val[2][2] + M.val[2][3]
+    );
+}
+
 
 Matrix::Matrix () {
   m   = 0;

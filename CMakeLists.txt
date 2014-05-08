@@ -4,7 +4,7 @@ project (SfM)
 
 cmake_policy(SET CMP0015 NEW)
 set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_CXX_FLAGS "-std=c++11")
+set(CMAKE_CXX_FLAGS "-std=c++11 -Wall")
 
 
 if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm)

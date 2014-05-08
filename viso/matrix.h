@@ -41,6 +41,19 @@ Street, Fifth Floor, Boston, MA 02110-1301, USA
   typedef unsigned __int64  uint64_t;
 #endif
 
+#include "point3d.hh"
+
+/*
+ *  M.val[i][j]
+ *
+ *   -------> j ...n
+ *  |
+ *  |
+ *  |
+ *  V
+ *  i ...m
+ */
+
 #define endll endl << endl // double end line definition
 
 typedef double FLOAT;      // double precision
@@ -129,5 +142,7 @@ private:
   inline FLOAT pythag(FLOAT a,FLOAT b);
 
 };
+
+Point3d affineTransform(const Matrix &M, const Point3d &p);
 
 #endif // MATRIX_H

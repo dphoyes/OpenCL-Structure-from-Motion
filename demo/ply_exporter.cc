@@ -1,6 +1,6 @@
 #include "ply_exporter.hh"
 
-int export_ply(const std::vector<Reconstruction::point3d> &points, const std::string &filename)
+int export_ply(const std::vector<Point3d> &points, const std::string &filename)
 {
     std::ofstream out(filename);
 

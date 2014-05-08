@@ -49,7 +49,7 @@ void PointCloudViewer::run()
             glm::vec3{0,0.00001,0}, glm::vec3{0,-2,0},
         };
         glBindBuffer(GL_ARRAY_BUFFER, axes_obj.vbo);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Reconstruction::point3d)*axes_geom.size(), &axes_geom[0], GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Point3d)*axes_geom.size(), &axes_geom[0], GL_STATIC_DRAW);
     }
 
     updateViewFromMouse(sf::Vector2i{}, 0);
@@ -83,7 +83,7 @@ void PointCloudViewer::run()
                 if (point_cloud_changed)
                 {
                     glBindBuffer(GL_ARRAY_BUFFER, point_cloud_obj.vbo);
-                    glBufferData(GL_ARRAY_BUFFER, sizeof(Reconstruction::point3d)*point_cloud->size(), &point_cloud->front(), GL_STATIC_DRAW);
+                    glBufferData(GL_ARRAY_BUFFER, sizeof(Point3d)*point_cloud->size(), &point_cloud->front(), GL_STATIC_DRAW);
                     point_cloud_changed = false;
                 }
                 if (point_cloud != nullptr)
@@ -118,7 +118,7 @@ void PointCloudViewer::run()
     }
 }
 
-void PointCloudViewer::update(const std::vector<Reconstruction::point3d> &points)
+void PointCloudViewer::update(const std::vector<Point3d> &points)
 {
     std::lock_guard<std::mutex> lock(point_cloud_buffer_mutex);
     point_cloud = &points;

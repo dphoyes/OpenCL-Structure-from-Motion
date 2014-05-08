@@ -31,6 +31,7 @@ Street, Fifth Floor, Boston, MA 02110-1301, USA
 
 #include "matcher.h"
 #include "matrix.h"
+#include "point3d.hh"
 
 class Reconstruction {
 
@@ -42,13 +43,6 @@ public:
   // deconstructor
   ~Reconstruction ();
   
-  // a generic 3d point
-  struct point3d {
-    float x,y,z;
-    point3d () {}
-    point3d (float x,float y,float z) : x(x),y(y),z(z) {}
-  };
-
   // set calibration parameters (intrinsics), must be called at least once
   // input: f ....... focal length (assumes fu=fv)
   //        cu,cv ... principal point
@@ -66,7 +60,7 @@ public:
   void update (std::vector<Matcher::p_match> p_matched,Matrix Tr,int32_t point_type=1,int32_t min_track_length=2,double max_dist=30,double min_angle=2);
   
   // return currently computed 3d points (finished tracks)
-  const std::vector<point3d> &getPoints() { return points; }
+  const std::vector<Point3d> &getPoints() { return points; }
 
 private:
   
@@ -85,14 +79,14 @@ private:
   
   enum result { UPDATED, FAILED, CONVERGED };
   
-  bool    initPoint(const track &t,point3d &p);
-  bool    refinePoint(const track &t,point3d &p);
-  double  pointDistance(const track &t,point3d &p);
-  double  rayAngle(const track &t,point3d &p);
-  int32_t pointType(const track &t,point3d &p);
-  result  updatePoint(const track &t,point3d &p,const FLOAT &step_size,const FLOAT &eps);
+  bool    initPoint(const track &t,Point3d &p);
+  bool    refinePoint(const track &t,Point3d &p);
+  double  pointDistance(const track &t,Point3d &p);
+  double  rayAngle(const track &t,Point3d &p);
+  int32_t pointType(const track &t,Point3d &p);
+  result  updatePoint(const track &t,Point3d &p,const FLOAT &step_size,const FLOAT &eps);
   void    computeObservations(const std::vector<point2d> &p);
-  bool    computePredictionsAndJacobian(const std::vector<Matrix>::iterator &P_begin,const std::vector<Matrix>::iterator &P_end,point3d &p);
+  bool    computePredictionsAndJacobian(const std::vector<Matrix>::iterator &P_begin,const std::vector<Matrix>::iterator &P_end,Point3d &p);
   void    testJacobian();
   
   // calibration matrices
@@ -102,7 +96,7 @@ private:
   std::vector<Matrix>  Tr_total;
   std::vector<Matrix>  Tr_inv_total;
   std::vector<Matrix>  P_total;
-  std::vector<point3d> points;
+  std::vector<Point3d> points;
   
   FLOAT *J;                     // jacobian
   FLOAT *p_observe,*p_predict;  // observed and predicted 2d points

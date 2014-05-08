@@ -1,13 +1,14 @@
 #ifndef GUI_H__
 #define GUI_H__
 
-#include <reconstruction.h>
+#include <vector>
+#include <point3d.hh>
 
 class PointCloudViewerInterface
 {
 public:
     virtual void run() = 0;
-    virtual void update(const std::vector<Reconstruction::point3d> &points) = 0;
+    virtual void update(const std::vector<Point3d> &points) = 0;
     virtual void waitClose() = 0;
 };
 
@@ -15,7 +16,7 @@ class NoPointCloudViewer: public PointCloudViewerInterface
 {
 public:
     void run() override {}
-    void update(const std::vector<Reconstruction::point3d> &points) override {}
+    void update(const std::vector<Point3d> &points) override {}
     void waitClose() override {}
 };
 
@@ -51,7 +52,7 @@ class PointCloudViewer: public PointCloudViewerInterface
     obj_t point_cloud_obj;
     obj_t axes_obj;
 
-    const std::vector<Reconstruction::point3d> *point_cloud = nullptr;
+    const std::vector<Point3d> *point_cloud = nullptr;
     bool point_cloud_changed = false;
     std::mutex point_cloud_buffer_mutex;
 
@@ -67,7 +68,7 @@ class PointCloudViewer: public PointCloudViewerInterface
 public:
     PointCloudViewer();
     void run() override;
-    void update(const std::vector<Reconstruction::point3d> &points) override;
+    void update(const std::vector<Point3d> &points) override;
     void waitClose() override;
 
 private:

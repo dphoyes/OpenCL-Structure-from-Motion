@@ -14,9 +14,9 @@ class StructureFromMotion
     bool is_first_frame = true;
     std::array<uint32_t, 3> dims;
 
-    // pose at each frame (this matrix transforms a point from the current
-    // frame's camera coordinates to the first frame's camera coordinates)
-    std::vector<Matrix> Tr_total;
+    // this matrix transforms a point from the first
+    // frame's camera coordinates to the current frame's camera coordinates
+    Matrix Tr_total = Matrix::eye(4);
 
     std::shared_ptr<OpenCLContainer> cl_container;
 
@@ -46,21 +46,20 @@ public:
 
         if (is_first_frame)
         {
-            Tr_total.push_back(Matrix::eye(4));
             is_first_frame = false;
             std::cout << std::endl;
         }
         else if (viso_success)
         {
             Matrix motion = Matrix::inv(viso->getMotion());
-            Tr_total.push_back( Tr_total.back() * motion );
+            Tr_total = Tr_total * motion;
 
             // print stats
             double num_matches = viso->getNumberOfMatches();
             double num_inliers = viso->getNumberOfInliers();
             std::cout << ", Matches: " << num_matches;
             std::cout << ", Inliers: " << 100.0*num_inliers/num_matches << '%' << ", Current pose: " << std::endl;
-            std::cout << Tr_total.back() << std::endl << std::endl;
+            std::cout << Tr_total << std::endl << std::endl;
 
 //            reconstruction.update(viso.getMatches(),viso.getMotion(), 2, 2, 30, 3);
             reconstruction.update(viso->getMatches(),viso->getMotion(), 0, 2, 30, 3);
@@ -69,13 +68,12 @@ public:
         }
         else
         {
-            Tr_total.push_back(Tr_total.back());
             std::cout << "No motion" << std::endl;
             replace = true;
         }
     }
 
-    const std::vector<Reconstruction::point3d> &getPoints()
+    const std::vector<Point3d> &getPoints()
     {
         return reconstruction.getPoints();
     }
