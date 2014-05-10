@@ -23,6 +23,7 @@ Street, Fifth Floor, Boston, MA 02110-1301, USA
 #define RECONSTRUCTION_H
 
 #include <iostream>
+#include <list>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -92,7 +93,7 @@ private:
   // calibration matrices
   Matrix K,Tr_cam_road;
   
-  std::vector<track>   tracks;
+  std::list<track>   tracks;
   std::vector<Matrix>  Tr_total;
   std::vector<Matrix>  Tr_inv_total;
   std::vector<Matrix>  P_total;

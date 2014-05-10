@@ -47,17 +47,17 @@ void Reconstruction::setCalibration (FLOAT f,FLOAT cu,FLOAT cv) {
   Tr_cam_road.val[2][3] = 0;
 }
 
-void Reconstruction::update (vector<Matcher::p_match> p_matched,Matrix Tr,int32_t point_type,int32_t min_track_length,double max_dist,double min_angle) {
+void Reconstruction::update (vector<Matcher::p_match> p_matched,Matrix rev_Tr,int32_t point_type,int32_t min_track_length,double max_dist,double min_angle) {
   
     for (Point3d &p : points)
     {
-        p = affineTransform(Tr, p);
+        p = affineTransform(rev_Tr, p);
     }
 
     // update transformation vector
     Matrix Tr_total_curr;
-    if (Tr_total.size()==0) Tr_total_curr = Matrix::inv(Tr);
-    else                    Tr_total_curr = Tr_total.back() * Matrix::inv(Tr);
+    if (Tr_total.size()==0) Tr_total_curr = Matrix::inv(rev_Tr);
+    else                    Tr_total_curr = Tr_total.back() * Matrix::inv(rev_Tr);
     Tr_total.push_back(Tr_total_curr);
     Tr_inv_total.push_back(Matrix::inv(Tr_total_curr));
      
@@ -67,82 +67,79 @@ void Reconstruction::update (vector<Matcher::p_match> p_matched,Matrix Tr,int32_
     
     // current frame
     int32_t current_frame = Tr_total.size();
-    
+
     // create index vector
     int32_t track_idx_max = 0;
-    for (vector<Matcher::p_match>::iterator m=p_matched.begin(); m!=p_matched.end(); m++)
-      if (m->i1p > track_idx_max)
-        track_idx_max = m->i1p;
-    for (vector<track>::iterator t=tracks.begin(); t!=tracks.end(); t++)
-      if (t->last_idx > track_idx_max)
-        track_idx_max = t->last_idx;
-    std::vector<int32_t> track_idx (track_idx_max+1);
-    for (int32_t i=0; i<=track_idx_max; i++)
-      track_idx[i] = -1;
-    for (int32_t i=0; i<int32_t(tracks.size()); i++)
-      track_idx[tracks[i].last_idx] = i;
-    
-    // associate matches to tracks
-    for (vector<Matcher::p_match>::iterator m=p_matched.begin(); m!=p_matched.end(); m++) {
-      
-      // track index (-1 = no existing track)
-      int32_t idx = track_idx[m->i1p];
-      
-      // add to existing track
-      if (idx>=0 && tracks[idx].last_frame==current_frame-1) {
-        
-        tracks[idx].pixels.push_back(point2d(m->u1c,m->v1c));
-        tracks[idx].last_frame = current_frame;
-        tracks[idx].last_idx   = m->i1c;
-        
-      // create new track
-      } else {
-        track t;
-        t.pixels.push_back(point2d(m->u1p,m->v1p));
-        t.pixels.push_back(point2d(m->u1c,m->v1c));
-        t.first_frame = current_frame-1;
-        t.last_frame  = current_frame;
-        t.last_idx    = m->i1c;
-        tracks.push_back(t);
-      }
+    for (auto &m : p_matched)  if (m.i1p      > track_idx_max)  track_idx_max = m.i1p;
+    for (auto &t : tracks)     if (t.last_idx > track_idx_max)  track_idx_max = t.last_idx;
+    std::vector<track*> track_map (track_idx_max+1, nullptr);
+    for (auto &t : tracks)
+    {
+        track_map[t.last_idx] = &t;
     }
     
-    // copy tracks
-    vector<track> tracks_copy = tracks;
-    tracks.clear();
-    
-    // devise tracks into active or reconstruct 3d points
-    for (vector<track>::iterator t=tracks_copy.begin(); t!=tracks_copy.end(); t++) {
-      
-      // track has been extended
-      if (t->last_frame==current_frame) {
-        
-        // push back to active tracks
-        tracks.push_back(*t);
-        
-      // track lost
-      } else {
-        
-        // add to 3d reconstruction
-        if (int32_t(t->pixels.size())>=min_track_length) {
-          
-          // 3d point
-          Point3d p;
-          
-          // try to init point from first and last track frame
-          if (initPoint(*t,p)) {
-              if (pointType(*t,p)>=point_type) {
-                  if (refinePoint(*t,p)) {
-  //                    cout << "Point distance: " << pointDistance(*t,p) << " Ray angle: " << rayAngle(*t,p) << endl;
-                      if(pointDistance(*t,p)<max_dist && rayAngle(*t,p)>min_angle) {
-                          p = affineTransform(Tr_inv_total.back(), p);
-                          points.push_back(p);
-                      }
-                  }
-              }
-          }
+    // associate matches to tracks
+    for (auto &m : p_matched)
+    {
+        // track index (nullptr = no existing track)
+        track *tr = track_map[m.i1p];
+
+        // add to existing track
+        if (tr!=nullptr && tr->last_frame==current_frame-1)
+        {
+            tr->pixels.push_back(point2d(m.u1c,m.v1c));
+            tr->last_frame = current_frame;
+            tr->last_idx   = m.i1c;
         }
-      }
+        // create new track
+        else
+        {
+            track t;
+            t.pixels.push_back(point2d(m.u1p,m.v1p));
+            t.pixels.push_back(point2d(m.u1c,m.v1c));
+            t.first_frame = current_frame-1;
+            t.last_frame  = current_frame;
+            t.last_idx    = m.i1c;
+            tracks.push_back(t);
+        }
+    }
+        
+    // devise tracks into active or reconstruct 3d points
+    for (auto t = tracks.begin(); t != tracks.end();)
+    {
+        // track lost
+        if (t->last_frame != current_frame)
+        {
+//            std::cerr << t->last_frame << " " << current_frame << std::endl;
+            // add to 3d reconstruction
+            if (int32_t(t->pixels.size())>=min_track_length)
+            {
+                // 3d point
+                Point3d p;
+
+                // try to init point from first and last track frame
+                if (initPoint(*t,p))
+                {
+                    if (pointType(*t,p)>=point_type)
+                    {
+                        if (refinePoint(*t,p))
+                        {
+                            // cout << "Point distance: " << pointDistance(t,p) << " Ray angle: " << rayAngle(t,p) << endl;
+                            if(pointDistance(*t,p)<max_dist && rayAngle(*t,p)>min_angle)
+                            {
+                                p = affineTransform(Tr_inv_total.back(), p);
+                                points.push_back(p);
+                            }
+                        }
+                    }
+                }
+            }
+            t = tracks.erase(t);
+        }
+        else
+        {
+            t++;
+        }
     }
     
 //    cout << "T: " << tracks.size() << endl;
