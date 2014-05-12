@@ -24,6 +24,7 @@ Street, Fifth Floor, Boston, MA 02110-1301, USA
 
 #include <iostream>
 #include <list>
+#include <deque>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -70,12 +71,26 @@ private:
     point2d () {}
     point2d (float u,float v) : u(u),v(v) {}
   };
+
+  struct frame_state_t {
+      Matrix fwd;
+      Matrix inv;
+      Matrix proj;
+      unsigned frames_ago = 0;
+      unsigned track_count = 0;
+      frame_state_t (const Matrix &fwd, const Matrix &inv, const Matrix &proj)
+          :   fwd (fwd)
+          ,   inv (inv)
+          ,   proj(proj)
+      {}
+  };
   
   struct track {
     std::vector<point2d> pixels;
-    int32_t first_frame;
-    int32_t last_frame;
+    frame_state_t *first_frame;
+    frame_state_t *last_frame;
     int32_t last_idx;
+    bool refreshed;
   };
   
   enum result { UPDATED, FAILED, CONVERGED };
@@ -87,20 +102,20 @@ private:
   int32_t pointType(const track &t,Point3d &p);
   result  updatePoint(const track &t,Point3d &p,const FLOAT &step_size,const FLOAT &eps);
   void    computeObservations(const std::vector<point2d> &p);
-  bool    computePredictionsAndJacobian(const std::vector<Matrix>::iterator &P_begin,const std::vector<Matrix>::iterator &P_end,Point3d &p);
+  bool    computePredictionsAndJacobian(const std::deque<frame_state_t>::iterator &Tr_begin,const std::deque<frame_state_t>::iterator &Tr_end,Point3d &p);
   void    testJacobian();
   
   // calibration matrices
   Matrix K,Tr_cam_road;
-  
+
   std::list<track>   tracks;
-  std::vector<Matrix>  Tr_total;
-  std::vector<Matrix>  Tr_inv_total;
-  std::vector<Matrix>  P_total;
   std::vector<Point3d> points;
+  std::deque<frame_state_t> frames;
   
   FLOAT *J;                     // jacobian
   FLOAT *p_observe,*p_predict;  // observed and predicted 2d points
+
+  static const unsigned max_track_length = 6;
 
 };
 

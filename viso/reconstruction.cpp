@@ -53,21 +53,21 @@ void Reconstruction::update (vector<Matcher::p_match> p_matched,Matrix rev_Tr,in
     {
         p = affineTransform(rev_Tr, p);
     }
+    while(!frames.empty() && frames.front().track_count == 0)
+    {
+        frames.pop_front();
+    }
+    for (auto &f : frames)
+    {
+        f.frames_ago += 1;
+        f.fwd = rev_Tr * f.fwd;
+        f.inv = Matrix::inv(f.fwd);
+        f.proj = K*f.inv.getMat(0,0,2,3);
+    }
 
-    // update transformation vector
-    Matrix Tr_total_curr;
-    if (Tr_total.size()==0) Tr_total_curr = Matrix::inv(rev_Tr);
-    else                    Tr_total_curr = Tr_total.back() * Matrix::inv(rev_Tr);
-    Tr_total.push_back(Tr_total_curr);
-    Tr_inv_total.push_back(Matrix::inv(Tr_total_curr));
-     
-    // update projection vector
-    Matrix P_total_curr = K*Matrix::inv(Tr_total_curr).getMat(0,0,2,3);
-    P_total.push_back(P_total_curr);
+    Matrix eye4 = Matrix::eye(4);
+    frames.push_back(frame_state_t(eye4, eye4, K*eye4.getMat(0,0,2,3)));
     
-    // current frame
-    int32_t current_frame = Tr_total.size();
-
     // create index vector
     int32_t track_idx_max = 0;
     for (auto &m : p_matched)  if (m.i1p      > track_idx_max)  track_idx_max = m.i1p;
@@ -84,73 +84,72 @@ void Reconstruction::update (vector<Matcher::p_match> p_matched,Matrix rev_Tr,in
         // track index (nullptr = no existing track)
         track *tr = track_map[m.i1p];
 
-        // add to existing track
-        if (tr!=nullptr && tr->last_frame==current_frame-1)
-        {
-            tr->pixels.push_back(point2d(m.u1c,m.v1c));
-            tr->last_frame = current_frame;
-            tr->last_idx   = m.i1c;
-        }
         // create new track
-        else
+        if (tr == nullptr || tr->refreshed)
         {
-            track t;
-            t.pixels.push_back(point2d(m.u1p,m.v1p));
-            t.pixels.push_back(point2d(m.u1c,m.v1c));
-            t.first_frame = current_frame-1;
-            t.last_frame  = current_frame;
-            t.last_idx    = m.i1c;
-            tracks.push_back(t);
+            tracks.push_back(track());
+            tr = &tracks.back();
+            tr->first_frame = &frames.back();
+            tr->first_frame->track_count += 1;
+            tr->pixels.push_back(point2d(m.u1p,m.v1p));
+        }
+
+        if (tr->pixels.size() < max_track_length)
+        {
+            // add to existing track
+            tr->pixels.push_back(point2d(m.u1c,m.v1c));
+            tr->last_idx    = m.i1c;
+            tr->refreshed = true;
         }
     }
         
     // devise tracks into active or reconstruct 3d points
-    for (auto t = tracks.begin(); t != tracks.end();)
+    for (auto tr = tracks.begin(); tr != tracks.end();)
     {
-        // track lost
-        if (t->last_frame != current_frame)
+        if (tr->refreshed)
         {
-//            std::cerr << t->last_frame << " " << current_frame << std::endl;
+            tr->refreshed = false;
+            tr++;
+            continue;
+        }
+        // track lost
+        else
+        {
+            tr->last_frame = &frames.back();
+
             // add to 3d reconstruction
-            if (int32_t(t->pixels.size())>=min_track_length)
+            if (int32_t(tr->pixels.size())>=min_track_length)
             {
                 // 3d point
                 Point3d p;
 
                 // try to init point from first and last track frame
-                if (initPoint(*t,p))
+                if (initPoint(*tr,p))
                 {
-                    if (pointType(*t,p)>=point_type)
+                    if (pointType(*tr,p)>=point_type)
                     {
-                        if (refinePoint(*t,p))
+                        if (refinePoint(*tr,p))
                         {
                             // cout << "Point distance: " << pointDistance(t,p) << " Ray angle: " << rayAngle(t,p) << endl;
-                            if(pointDistance(*t,p)<max_dist && rayAngle(*t,p)>min_angle)
+                            if(pointDistance(*tr,p)<max_dist && rayAngle(*tr,p)>min_angle)
                             {
-                                p = affineTransform(Tr_inv_total.back(), p);
                                 points.push_back(p);
                             }
                         }
                     }
                 }
             }
-            t = tracks.erase(t);
-        }
-        else
-        {
-            t++;
+            tr->first_frame->track_count -= 1;
+            tr = tracks.erase(tr);
         }
     }
-    
-//    cout << "T: " << tracks.size() << endl;
-    //testJacobian();
 }
 
 bool Reconstruction::initPoint(const track &t,Point3d &p) {
-  
+
   // projection matrices
-  Matrix  P1 = P_total[t.first_frame];
-  Matrix  P2 = P_total[t.last_frame];
+  Matrix  P1 = t.first_frame->proj;
+  Matrix  P2 = t.last_frame->proj;
   
   // observations
   point2d p1 = t.pixels.front();
@@ -203,16 +202,17 @@ bool Reconstruction::refinePoint(const track &t,Point3d &p) {
 }
 
 double Reconstruction::pointDistance(const track &t,Point3d &p) {
-  int32_t mid_frame = (t.first_frame+t.last_frame)/2;
-  double dx = Tr_total[mid_frame].val[0][3]-p.x;
-  double dy = Tr_total[mid_frame].val[1][3]-p.y;
-  double dz = Tr_total[mid_frame].val[2][3]-p.z;
+  unsigned mid_frames_ago = (t.first_frame->frames_ago + t.last_frame->frames_ago + 1) / 2;
+  Matrix *mid_fwd = &frames.rbegin()[mid_frames_ago].fwd;
+  double dx = mid_fwd->val[0][3]-p.x;
+  double dy = mid_fwd->val[1][3]-p.y;
+  double dz = mid_fwd->val[2][3]-p.z;
   return sqrt(dx*dx+dy*dy+dz*dz);
 }
 
 double Reconstruction::rayAngle(const track &t,Point3d &p) {
-  Matrix c1 = Tr_total[t.first_frame].getMat(0,3,2,3);
-  Matrix c2 = Tr_total[t.last_frame].getMat(0,3,2,3);
+  Matrix c1 = t.first_frame->fwd.getMat(0,3,2,3);
+  Matrix c2 = t.last_frame->fwd.getMat(0,3,2,3);
   Matrix pt(3,1);
   pt.val[0][0] = p.x;
   pt.val[1][0] = p.y;
@@ -232,8 +232,8 @@ int32_t Reconstruction::pointType(const track &t,Point3d &p) {
   
   // project point to first and last camera coordinates
 
-  Point3d x1c = affineTransform(Tr_inv_total[t.first_frame], p);
-  Point3d x2c = affineTransform(Tr_inv_total[t.last_frame], p);
+  Point3d x1c = affineTransform(t.first_frame->inv, p);
+  Point3d x2c = affineTransform(t.last_frame->inv, p);
   Point3d x2r = affineTransform(Tr_cam_road, x2c);
   
   // point not visible
@@ -261,10 +261,10 @@ Reconstruction::result Reconstruction::updatePoint(const track &t,Point3d &p,con
   computeObservations(t.pixels);
   
   // compute predictions
-  vector<Matrix>::iterator P_begin = P_total.begin()+t.first_frame;
-  vector<Matrix>::iterator P_end   = P_begin+num_frames-1;
+  auto f_begin = frames.end()-1-t.first_frame->frames_ago;
+  auto f_end   = f_begin+num_frames-1;
   
-  if (!computePredictionsAndJacobian(P_begin,P_end,p))
+  if (!computePredictionsAndJacobian(f_begin, f_end,p))
     return FAILED;
   
   // init
@@ -305,11 +305,13 @@ void Reconstruction::computeObservations(const vector<point2d> &pixels) {
   }
 }
 
-bool Reconstruction::computePredictionsAndJacobian(const vector<Matrix>::iterator &P_begin,const vector<Matrix>::iterator &P_end,Point3d &p) {
+bool Reconstruction::computePredictionsAndJacobian(const std::deque<frame_state_t>::iterator &f_begin,const std::deque<frame_state_t>::iterator &f_end,Point3d &p) {
   
   // for all frames do
   int32_t k=0;
-  for (vector<Matrix>::iterator P=P_begin; P<=P_end; P++) {
+  for (auto Tr=f_begin; Tr<=f_end; Tr++) {
+
+    Matrix *P = &Tr->proj;
     
     // precompute coefficients
     FLOAT a  = P->val[0][0]*p.x+P->val[0][1]*p.y+P->val[0][2]*p.z+P->val[0][3];
@@ -340,6 +342,7 @@ bool Reconstruction::computePredictionsAndJacobian(const vector<Matrix>::iterato
   return true;
 }
 
+/*
 void Reconstruction::testJacobian() {
   cout << "=================================" << endl;
   cout << "TESTING JACOBIAN" << endl;
@@ -388,3 +391,4 @@ void Reconstruction::testJacobian() {
   delete p_predict;
   cout << "=================================" << endl;
 }
+*/
