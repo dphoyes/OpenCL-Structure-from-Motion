@@ -165,11 +165,11 @@ namespace filter {
 
       for (size_t i=0; i<N/2; i++)
       {
-        res.first[i] = a[i];
+        res.second[i] = a[i];
       }
       for (size_t i=0; i<N/2; i++)
       {
-        res.second[i] = a[N/2+i];
+        res.first[i] = a[N/2+i];
       }
       return res;
     }
@@ -253,7 +253,7 @@ namespace filter {
 #endif
       }
     }
-    
+
     // convolve image with a (1,2,0,-2,-1) row vector. Result is accumulated into output.
     // This one works on 16bit input and 8bit output.
     // output is scaled by 1/128, then clamped to [-128,128], and finally shifted to [0,255].
@@ -485,35 +485,35 @@ namespace filter {
         const auto result_h1 = result_h+1;
         const auto result_v1 = result_v+1;
         const auto u0 = array_unpack_8to16(*i0);
-        add_array_vals_in_place(*result_h, u0.first);
-        add_array_vals_in_place(*result_h1, u0.second);
-        add_array_vals_in_place(*result_v, u0.first);
-        add_array_vals_in_place(*result_v1, u0.second);
+        add_array_vals_in_place(*result_h, u0.second);
+        add_array_vals_in_place(*result_h1, u0.first);
+        add_array_vals_in_place(*result_v, u0.second);
+        add_array_vals_in_place(*result_v1, u0.first);
         const auto u1 = array_unpack_8to16(*i1);
-        add_array_vals_in_place(*result_h, u1.first);
-        add_array_vals_in_place(*result_h, u1.first);
-        add_array_vals_in_place(*result_h1, u1.second);
-        add_array_vals_in_place(*result_h1, u1.second);
+        add_array_vals_in_place(*result_h, u1.second);
+        add_array_vals_in_place(*result_h, u1.second);
+        add_array_vals_in_place(*result_h1, u1.first);
+        add_array_vals_in_place(*result_h1, u1.first);
         const auto u1_x4 = mul_array_vals(u1, 4);
-        add_array_vals_in_place(*result_v, u1_x4.first);
-        add_array_vals_in_place(*result_v1, u1_x4.second);
+        add_array_vals_in_place(*result_v, u1_x4.second);
+        add_array_vals_in_place(*result_v1, u1_x4.first);
         const auto u2 = array_unpack_8to16(*i2);
         const auto u2_x6 = mul_array_vals(u2, 6);
-        add_array_vals_in_place(*result_v, u2_x6.first);
-        add_array_vals_in_place(*result_v1, u2_x6.second);
+        add_array_vals_in_place(*result_v, u2_x6.second);
+        add_array_vals_in_place(*result_v1, u2_x6.first);
         const auto u3 = array_unpack_8to16(*i3);
-        sub_array_vals_in_place(*result_h, u3.first);
-        sub_array_vals_in_place(*result_h, u3.first);
-        sub_array_vals_in_place(*result_h1, u3.second);
-        sub_array_vals_in_place(*result_h1, u3.second);
+        sub_array_vals_in_place(*result_h, u3.second);
+        sub_array_vals_in_place(*result_h, u3.second);
+        sub_array_vals_in_place(*result_h1, u3.first);
+        sub_array_vals_in_place(*result_h1, u3.first);
         const auto u3_x4 = mul_array_vals(u3, 4);
-        add_array_vals_in_place(*result_v, u3_x4.first);
-        add_array_vals_in_place(*result_v1, u3_x4.second);
+        add_array_vals_in_place(*result_v, u3_x4.second);
+        add_array_vals_in_place(*result_v1, u3_x4.first);
         const auto u4 = array_unpack_8to16(*i4);
-        sub_array_vals_in_place(*result_h, u4.first);
-        sub_array_vals_in_place(*result_h1, u4.second);
-        add_array_vals_in_place(*result_v, u4.first);
-        add_array_vals_in_place(*result_v1, u4.second);
+        sub_array_vals_in_place(*result_h, u4.second);
+        sub_array_vals_in_place(*result_h1, u4.first);
+        add_array_vals_in_place(*result_v, u4.second);
+        add_array_vals_in_place(*result_v1, u4.first);
 #endif
       }
     }
@@ -560,11 +560,11 @@ namespace filter {
         *result     = add_array_vals(u0.second, u1.second);
         *(result+1) = add_array_vals(u0.first, u1.first);
         const auto u3 = array_unpack_8to16(*i3);
-        *result     = sub_array_vals(*result, u3.second);
-        *(result+1) = sub_array_vals(*(result+1), u3.first);
+        sub_array_vals_in_place(*result, u3.second);
+        sub_array_vals_in_place(*(result+1), u3.first);
         const auto u4 = array_unpack_8to16(*i4);
-        *result     = sub_array_vals(*result, u4.second);
-        *(result+1) = sub_array_vals(*(result+1), u4.first);
+        sub_array_vals_in_place(*result, u4.second);
+        sub_array_vals_in_place(*(result+1), u4.first);
 #endif
       }
     }
@@ -654,15 +654,15 @@ namespace filter {
         *result_v     = u0.second;
         *(result_v+1) = u0.first;
         const auto u1 = array_unpack_8to16(*i1);
-        *result_v     = add_array_vals(*result_v, u1.second);
-        *(result_v+1) = add_array_vals(*(result_v+1), u1.first);
-        *result_v     = add_array_vals(*result_v, u1.second);
-        *(result_v+1) = add_array_vals(*(result_v+1), u1.first);
+        add_array_vals_in_place(*result_v, u1.second);
+        add_array_vals_in_place(*(result_v+1), u1.first);
+        add_array_vals_in_place(*result_v, u1.second);
+        add_array_vals_in_place(*(result_v+1), u1.first);
         const auto u2 = array_unpack_8to16(*i2);
-        *result_h     = sub_array_vals(*result_h, u2.second);
-        *(result_h+1) = sub_array_vals(*(result_h+1), u2.first);
-        *result_v     = add_array_vals(*result_v, u2.second);
-        *(result_v+1) = add_array_vals(*(result_v+1), u2.first);
+        sub_array_vals_in_place(*result_h, u2.second);
+        sub_array_vals_in_place(*(result_h+1), u2.first);
+        add_array_vals_in_place(*result_v, u2.second);
+        add_array_vals_in_place(*(result_v+1), u2.first);
 #endif
       }
     }
