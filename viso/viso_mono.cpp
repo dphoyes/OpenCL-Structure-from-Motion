@@ -38,6 +38,39 @@ bool VisualOdometryMono::process (uint8_t *I,uint32_t* dims,bool replace) {
   return updateMotion();
 }
 
+Matrix VisualOdometryMono::ransacEstimateF(const vector<Matcher::p_match> &p_matched)
+{
+    // initial RANSAC estimate of F
+    Matrix F;
+    inliers.clear();
+    for (int32_t k=0;k<param.ransac_iters;k++) {
+
+        // draw random sample set
+        vector<int32_t> active = getRandomSample(p_matched.size(),8);
+
+        // estimate fundamental matrix and get inliers
+        fundamentalMatrix(p_matched,active,F);
+        vector<int32_t> inliers_curr = getInlier(p_matched,F);
+
+        // update model if we are better
+        if (inliers_curr.size()>inliers.size())
+            inliers = inliers_curr;
+    }
+
+    // are there enough inliers?
+    if (inliers.size()<10)
+    {
+        F = Matrix();
+    }
+    else
+    {
+        // refine F using all inliers
+        fundamentalMatrix(p_matched,inliers,F);
+    }
+
+    return F;
+}
+
 vector<double> VisualOdometryMono::estimateMotion (vector<Matcher::p_match> p_matched) {
 
   // get number of matches
@@ -57,35 +90,14 @@ vector<double> VisualOdometryMono::estimateMotion (vector<Matcher::p_match> p_ma
 
   StartTimer estimate_f_timer("Estimate F time");
 
-  // initial RANSAC estimate of F
-  Matrix E,F;
-  inliers.clear();
-  for (int32_t k=0;k<param.ransac_iters;k++) {
-
-    // draw random sample set
-    vector<int32_t> active = getRandomSample(N,8);
-
-    // estimate fundamental matrix and get inliers
-    fundamentalMatrix(p_matched_normalized,active,F);
-    vector<int32_t> inliers_curr = getInlier(p_matched_normalized,F);
-
-    // update model if we are better
-    if (inliers_curr.size()>inliers.size())
-      inliers = inliers_curr;
-  }
-
-  // are there enough inliers?
-  if (inliers.size()<10)
-    return vector<double>();
-  
-  // refine F using all inliers
-  fundamentalMatrix(p_matched_normalized,inliers,F); 
+  Matrix F = ransacEstimateF(p_matched_normalized);
+  if (F.val == nullptr) return vector<double>();
 
   estimate_f_timer.end();
   
   // denormalise and extract essential matrix
   F = ~Tc*F*Tp;
-  E = ~K*F*K;
+  Matrix E = ~K*F*K;
   
   // re-enforce rank 2 constraint on essential matrix
   Matrix U,W,V;
@@ -273,7 +285,7 @@ void VisualOdometryMono::fundamentalMatrix (const vector<Matcher::p_match> &p_ma
   F = U*Matrix::diag(W)*~V;
 }
 
-vector<int32_t> VisualOdometryMono::getInlier (vector<Matcher::p_match> &p_matched,Matrix &F) {
+vector<int32_t> VisualOdometryMono::getInlier (const vector<Matcher::p_match> &p_matched,Matrix &F) {
 
   // extract fundamental matrix
   double f00 = F.val[0][0]; double f01 = F.val[0][1]; double f02 = F.val[0][2];

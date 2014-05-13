@@ -12,7 +12,11 @@ private:
 
     cl::Kernel kernel_get_inlier;
 
-    virtual std::vector<int32_t> getInlier (std::vector<Matcher::p_match> &p_matched,Matrix &F);
+    cl::Event p_matched_write_event;
+
+
+    Matrix                       ransacEstimateF(const std::vector<Matcher::p_match> &p_matched) override;
+    virtual std::vector<int32_t> getInlier (const std::vector<Matcher::p_match> &p_matched,Matrix &F) override;
 
 public:
     VisualOdometryMono_CL (parameters param, std::shared_ptr<OpenCLContainer> cl_container)

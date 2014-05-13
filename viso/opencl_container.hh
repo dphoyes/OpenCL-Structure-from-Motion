@@ -83,11 +83,11 @@ public:
         // Get list of platforms
         cl::Platform::get(&platforms);
         if (platforms.empty()) throw std::runtime_error("No OpenCL platforms found.");
-        std::cerr << "Found " << platforms.size() << " platforms\n";
+        std::cout << "Found " << platforms.size() << " platforms\n";
 
         for(auto p : platforms)
         {
-            std::cerr << "Platform: " << p.getInfo<CL_PLATFORM_VENDOR>() << "\n";
+            std::cout << "Platform: " << p.getInfo<CL_PLATFORM_VENDOR>() << "\n";
 
             // Get list of GPU devices
             try
@@ -98,7 +98,7 @@ public:
 
             if (!devices.empty())
             {
-                std::cerr << "Found " << devices.size() << " devices\n";
+                std::cout << "Found " << devices.size() << " devices\n";
 
                 // Select device
                 device = devices.at(0);
@@ -109,7 +109,7 @@ public:
 
         try
         {
-            std::cerr << "Using: " << platform.getInfo<CL_PLATFORM_VENDOR>() << ", " << device.getInfo<CL_DEVICE_NAME>() << "\n";
+            std::cout << "Using: " << platform.getInfo<CL_PLATFORM_VENDOR>() << ", " << device.getInfo<CL_DEVICE_NAME>() << "\n";
         }
         catch (cl::Error &e)
         {

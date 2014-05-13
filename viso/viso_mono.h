@@ -71,16 +71,17 @@ private:
     const T arr;
   };  
 
+  virtual Matrix       ransacEstimateF(const std::vector<Matcher::p_match> &p_matched);
   std::vector<double>  estimateMotion (std::vector<Matcher::p_match> p_matched);  
   Matrix               smallerThanMedian (Matrix &X,double &median);
   bool                 normalizeFeaturePoints (std::vector<Matcher::p_match> &p_matched,Matrix &Tp,Matrix &Tc);
-  void                 fundamentalMatrix (const std::vector<Matcher::p_match> &p_matched,const std::vector<int32_t> &active,Matrix &F);
   void                 EtoRt(Matrix &E,Matrix &K,std::vector<Matcher::p_match> &p_matched,Matrix &X,Matrix &R,Matrix &t);
   int32_t              triangulateChieral (std::vector<Matcher::p_match> &p_matched,Matrix &K,Matrix &R,Matrix &t,Matrix &X);
-  virtual std::vector<int32_t> getInlier (std::vector<Matcher::p_match> &p_matched,Matrix &F);
+  virtual std::vector<int32_t> getInlier (const std::vector<Matcher::p_match> &p_matched,Matrix &F);
   
 protected:
-  // parameters
+  void                 fundamentalMatrix (const std::vector<Matcher::p_match> &p_matched,const std::vector<int32_t> &active,Matrix &F);
+
   const parameters param;
 };
 

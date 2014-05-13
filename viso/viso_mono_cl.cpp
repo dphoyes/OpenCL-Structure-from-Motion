@@ -2,18 +2,54 @@
 
 using namespace std;
 
-vector<int32_t> VisualOdometryMono_CL::getInlier (vector<Matcher::p_match> &p_matched, Matrix &F)
+Matrix VisualOdometryMono_CL::ransacEstimateF(const vector<Matcher::p_match> &p_matched)
 {
     OpenCLContainer::Buffer buff_p_matched (cl_container->context, CL_MEM_READ_ONLY, p_matched.size()*sizeof(Matcher::p_match));
+
+    kernel_get_inlier.setArg(0, buff_p_matched.buff);
+    kernel_get_inlier.setArg(3, param.inlier_threshold);
+
+    cl_container->queue.enqueueWriteBuffer(buff_p_matched.buff, CL_FALSE, 0, buff_p_matched.size, p_matched.data(), NULL, &p_matched_write_event);
+
+    // initial RANSAC estimate of F
+    Matrix F;
+    inliers.clear();
+    for (int32_t k=0;k<param.ransac_iters;k++) {
+
+        // draw random sample set
+        vector<int32_t> active = getRandomSample(p_matched.size(),8);
+
+        // estimate fundamental matrix and get inliers
+        fundamentalMatrix(p_matched,active,F);
+        vector<int32_t> inliers_curr = getInlier(p_matched,F);
+
+        // update model if we are better
+        if (inliers_curr.size()>inliers.size())
+            inliers = inliers_curr;
+    }
+
+    // are there enough inliers?
+    if (inliers.size()<10)
+    {
+        F = Matrix();
+    }
+    else
+    {
+        // refine F using all inliers
+        fundamentalMatrix(p_matched,inliers,F);
+    }
+
+    return F;
+}
+
+vector<int32_t> VisualOdometryMono_CL::getInlier (const vector<Matcher::p_match> &p_matched, Matrix &F)
+{
     OpenCLContainer::Buffer buff_inlier_mask (cl_container->context, CL_MEM_WRITE_ONLY, p_matched.size()*sizeof(int));
     OpenCLContainer::Buffer buff_fund_mat (cl_container->context, CL_MEM_READ_ONLY, 9*sizeof(double));
 
-    kernel_get_inlier.setArg(0, buff_p_matched.buff);
     kernel_get_inlier.setArg(1, buff_fund_mat.buff);
     kernel_get_inlier.setArg(2, buff_inlier_mask.buff);
-    kernel_get_inlier.setArg(3, param.inlier_threshold);
 
-    cl::Event p_matched_write_event; cl_container->queue.enqueueWriteBuffer(buff_p_matched.buff, CL_FALSE, 0, buff_p_matched.size, p_matched.data(), NULL, &p_matched_write_event);
     cl::Event fund_mat_write_event; cl_container->queue.enqueueWriteBuffer(buff_fund_mat.buff, CL_FALSE, 0, buff_fund_mat.size, &F.val[0][0], NULL, &fund_mat_write_event);
 
     cl::NDRange offset;
