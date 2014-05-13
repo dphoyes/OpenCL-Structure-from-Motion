@@ -14,7 +14,7 @@
 __kernel void kernel_xy(
         __global const struct p_match_t *p_matched, // 0
         __global const double *fund_mat, // 1
-        __global int *inlier_mask, // 2
+        __global char *inlier_mask, // 2
         double thresh // 3
         )
 {

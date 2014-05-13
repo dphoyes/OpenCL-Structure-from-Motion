@@ -44,7 +44,7 @@ Matrix VisualOdometryMono_CL::ransacEstimateF(const vector<Matcher::p_match> &p_
 
 vector<int32_t> VisualOdometryMono_CL::getInlier (const vector<Matcher::p_match> &p_matched, Matrix &F)
 {
-    OpenCLContainer::Buffer buff_inlier_mask (cl_container->context, CL_MEM_WRITE_ONLY, p_matched.size()*sizeof(int));
+    OpenCLContainer::Buffer buff_inlier_mask (cl_container->context, CL_MEM_WRITE_ONLY, p_matched.size()*sizeof(char));
     OpenCLContainer::Buffer buff_fund_mat (cl_container->context, CL_MEM_READ_ONLY, 9*sizeof(double));
 
     kernel_get_inlier.setArg(1, buff_fund_mat.buff);
@@ -59,7 +59,7 @@ vector<int32_t> VisualOdometryMono_CL::getInlier (const vector<Matcher::p_match>
     std::vector<cl::Event> kernel_deps {p_matched_write_event, fund_mat_write_event};
     cl::Event get_inlier_complete_event; cl_container->queue.enqueueNDRangeKernel(kernel_get_inlier, offset, globalSize, localSize, &kernel_deps, &get_inlier_complete_event);
 
-    std::vector<int> inlier_mask (p_matched.size());
+    std::vector<char> inlier_mask (p_matched.size());
     std::vector<cl::Event> inlier_mask_read_deps {get_inlier_complete_event};
     cl::Event inlier_mask_read_event; cl_container->queue.enqueueReadBuffer(buff_inlier_mask.buff, CL_FALSE, 0, buff_inlier_mask.size, inlier_mask.data(), &inlier_mask_read_deps, &inlier_mask_read_event);
 
