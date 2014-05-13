@@ -5,10 +5,8 @@ using namespace std;
 vector<int32_t> VisualOdometryMono_CL::getInlier (vector<Matcher::p_match> &p_matched, Matrix &F)
 {
     OpenCLContainer::Buffer buff_p_matched (cl_container->context, CL_MEM_READ_ONLY, p_matched.size()*sizeof(Matcher::p_match));
-    OpenCLContainer::Buffer buff_fund_mat (cl_container->context, CL_MEM_READ_ONLY, 9*sizeof(double));
     OpenCLContainer::Buffer buff_inlier_mask (cl_container->context, CL_MEM_WRITE_ONLY, p_matched.size()*sizeof(int));
-
-    cl::Kernel kernel_get_inlier (cl_container->getKernel("inlier.cl", "kernel_xy"));
+    OpenCLContainer::Buffer buff_fund_mat (cl_container->context, CL_MEM_READ_ONLY, 9*sizeof(double));
 
     kernel_get_inlier.setArg(0, buff_p_matched.buff);
     kernel_get_inlier.setArg(1, buff_fund_mat.buff);

@@ -10,13 +10,15 @@ class VisualOdometryMono_CL : public VisualOdometryMono
 private:
     const std::shared_ptr<OpenCLContainer> cl_container;
 
+    cl::Kernel kernel_get_inlier;
+
     virtual std::vector<int32_t> getInlier (std::vector<Matcher::p_match> &p_matched,Matrix &F);
 
 public:
     VisualOdometryMono_CL (parameters param, std::shared_ptr<OpenCLContainer> cl_container)
-        :
-            VisualOdometryMono (param)
+        :   VisualOdometryMono (param)
         ,   cl_container (cl_container)
+        ,   kernel_get_inlier (cl_container->getKernel("inlier.cl", "kernel_xy"))
     {}
 
 };

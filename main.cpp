@@ -23,7 +23,7 @@ struct cmd_params_t
     string out_file;
     unsigned n_frames = 0;
     bool use_gui = false;
-    bool use_opencl = false;
+    bool use_opencl = true;
 };
 
 cmd_params_t getParams(int argc, char** argv)
