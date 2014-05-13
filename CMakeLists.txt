@@ -5,7 +5,7 @@ project (SfM)
 cmake_policy(SET CMP0015 NEW)
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_CXX_FLAGS "-std=c++11 -Wall")
-
+#add_definitions(-DUSE_SIMD)
 
 if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm)
 # arm
@@ -19,7 +19,7 @@ if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm)
     list(APPEND extra_libs alteracl elf alterahalmmd alterammdpcie c_accel_runtime stdc++ rt)
 else()
 # x86
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse3")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
     list(APPEND extra_libs sfml-graphics sfml-window sfml-system GLEW GL OpenCL)
 endif()
 

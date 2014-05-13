@@ -5493,7 +5493,7 @@ void vertexsort(vertex *sortarray, int arraysize)
     /* Recursively sort the left subset. */
     vertexsort(sortarray, left);
   }
-  if (right < arraysize - 2) {
+  if (arraysize >= 0 && right < arraysize - 2) {
     /* Recursively sort the right subset. */
     vertexsort(&sortarray[right + 1], arraysize - right - 1);
   }

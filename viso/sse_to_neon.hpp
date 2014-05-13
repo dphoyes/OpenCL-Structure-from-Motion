@@ -10,41 +10,6 @@
 #define neon_test_sse_to_neon_hpp
 
 #include <arm_neon.h>
-#define __MM_MALLOC_H
-#if defined(__MM_MALLOC_H)
-// copied from mm_malloc.h {
-#include <stdlib.h>
-
-/* We can't depend on <stdlib.h> since the prototype of posix_memalign
- may not be visible.  */
-#ifndef __cplusplus
-extern int posix_memalign (void **, size_t, size_t);
-#else
-extern "C" int posix_memalign (void **, size_t, size_t) throw ();
-#endif
-
-static __inline void *
-_mm_malloc (size_t size, size_t alignment)
-{
-    void *ptr;
-    if (alignment == 1)
-        return malloc (size);
-    if (alignment == 2 || (sizeof (void *) == 8 && alignment == 4))
-        alignment = sizeof (void *);
-    if (posix_memalign (&ptr, alignment, size) == 0)
-        return ptr;
-    else
-        return NULL;
-}
-
-static __inline void
-_mm_free (void * ptr)
-{
-    free (ptr);
-}
-// } copied from mm_malloc.h
-#endif
-
 
 typedef int16x8_t __m128i;
 typedef float32x4_t __m128;
@@ -105,8 +70,8 @@ inline void _mm_store_ps(float32_t* p, __m128&a){
 
 
 // LOAD
-inline __m128i _mm_loadu_si128(__m128i* p){//For SSE address p does not need be 16-byte aligned
-    return reinterpret_cast<__m128i>(vld1q_s16(reinterpret_cast<int16_t*>(p)));
+inline __m128i _mm_loadu_si128(const __m128i* const p){//For SSE address p does not need be 16-byte aligned
+    return reinterpret_cast<__m128i>(vld1q_s16(reinterpret_cast<const int16_t *const>(p)));
 }
 
 inline __m128i _mm_load_si128(__m128i* p){//For SSE address p must be 16-byte aligned
