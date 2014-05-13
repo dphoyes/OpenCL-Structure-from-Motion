@@ -5,7 +5,7 @@ project (SfM)
 cmake_policy(SET CMP0015 NEW)
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -O3")
-#add_definitions(-DUSE_SIMD)
+add_definitions(-DUSE_SIMD)
 
 if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm)
 # arm
