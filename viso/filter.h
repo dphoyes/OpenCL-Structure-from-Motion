@@ -22,22 +22,8 @@ Street, Fifth Floor, Boston, MA 02110-1301, USA
 #ifndef __FILTER_H__
 #define __FILTER_H__
 
-#include <array>
-#include <limits>
-#include <algorithm>
-
 #include <mm_malloc.h>
-
-#if defined(USE_SIMD)
-#if defined(__SSE3__)
-#include <emmintrin.h>
-#include <pmmintrin.h>
-#elif defined(__ARM_NEON__)
-#include <sse_to_neon.hpp>
-#else
-#error No SIMD implementation available
-#endif
-#endif
+#include "simd.hh"
 
 // define fixed-width datatypes for Visual Studio projects
 #ifndef _MSC_VER
@@ -61,11 +47,6 @@ namespace filter {
   namespace detail {
     void integral_image( const uint8_t* in, int32_t* out, int w, int h );
 
-#if defined(USE_SIMD)
-    void unpack_8bit_to_16bit( const __m128i a, __m128i& b0, __m128i& b1 );
-    void pack_16bit_to_8bit_saturate( const __m128i a0, const __m128i a1, __m128i& b );
-#endif
-    
     // convolve image with a (1,4,6,4,1) row vector. Result is accumulated into output.
     // output is scaled by 1/128, then clamped to [-128,128], and finally shifted to [0,255].
     void convolve_14641_row_5x5_16bit( const int16_t* in, uint8_t* out, int w, int h );

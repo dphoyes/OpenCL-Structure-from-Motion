@@ -64,200 +64,38 @@ namespace filter {
       }
     }
 
-#if defined(USE_SIMD)
-    void unpack_8bit_to_16bit( const __m128i a, __m128i& b0, __m128i& b1 ) {
-      __m128i zero = _mm_setzero_si128();
-      b0 = _mm_unpacklo_epi8( a, zero );
-      b1 = _mm_unpackhi_epi8( a, zero );
-    }
-    
-    void pack_16bit_to_8bit_saturate( const __m128i a0, const __m128i a1, __m128i& b ) {
-      b = _mm_packus_epi16( a0, a1 );
-    }
-#endif
+    using namespace simd;
 
-    template<size_t N>
-    std::array<int16_t, N> add_array_vals(const std::array<int16_t, N> &a, const std::array<int16_t, N> &b)
-    {
-      std::array<int16_t, N> res;
-      for (size_t i=0; i<N; i++)
-      {
-        res[i] = a[i] + b[i];
-      }
-      return res;
-    }
-
-    template<size_t N>
-    std::array<int16_t, N> sub_array_vals(const std::array<int16_t, N> &a, const std::array<int16_t, N> &b)
-    {
-      std::array<int16_t, N> res;
-      for (size_t i=0; i<N; i++)
-      {
-        res[i] = a[i] - b[i];
-      }
-      return res;
-    }
-
-    template<size_t N>
-    void add_array_vals_in_place(std::array<int16_t, N> &a, const std::array<int16_t, N> &b)
-    {
-      for (size_t i=0; i<N; i++)
-      {
-        a[i] += b[i];
-      }
-    }
-
-    template<size_t N>
-    void sub_array_vals_in_place(std::array<int16_t, N> &a, const std::array<int16_t, N> &b)
-    {
-      for (size_t i=0; i<N; i++)
-      {
-        a[i] -= b[i];
-      }
-    }
-
-    template<size_t N>
-    struct unpacked16arrays_t
-    {
-        std::array<int16_t,N> hi;
-        std::array<int16_t,N> lo;
-    };
-
-    template<size_t N>
-    unpacked16arrays_t<N> mul_array_vals(const unpacked16arrays_t<N> &a, const int multiplier)
-    {
-      unpacked16arrays_t<N> res;
-      for (size_t i=0; i<N; i++)
-      {
-        res.hi[i] = multiplier * a.hi[i];
-      }
-      for (size_t i=0; i<N; i++)
-      {
-        res.lo[i] = multiplier * a.lo[i];
-      }
-      return res;
-    }
-
-    template<size_t N>
-    std::array<int16_t, N> rshift_array_vals(const std::array<int16_t, N> &a, const unsigned shift_n)
-    {
-      std::array<int16_t, N> res;
-      for (size_t i=0; i<N; i++)
-      {
-        res[i] = a[i] >> shift_n;
-      }
-      return res;
-    }
-
-    template<size_t N>
-    std::array<uint8_t, 2*N> array_pack_16to8(const std::array<int16_t, N> &a, const std::array<int16_t, N> &b)
-    {
-      auto saturate = [](int16_t x) -> uint8_t {return std::min(uint16_t(std::numeric_limits<uint8_t>::max()), uint16_t(x));};
-      std::array<uint8_t, 2*N> res;
-      for (size_t i=0; i<N; i++)
-      {
-        res[i] = saturate(a[i]);
-      }
-      for (size_t i=0; i<N; i++)
-      {
-        res[N+i] = saturate(b[i]);
-      }
-      return res;
-    }
-
-    template<size_t N>
-    unpacked16arrays_t<N/2> array_unpack_8to16(const std::array<uint8_t, N> &a)
-    {
-      unpacked16arrays_t<N/2> res;
-
-      for (size_t i=0; i<N/2; i++)
-      {
-        res.hi[i] = a[i];
-      }
-      for (size_t i=0; i<N/2; i++)
-      {
-        res.lo[i] = a[N/2+i];
-      }
-      return res;
-    }
-    
     // convolve image with a (1,4,6,4,1) row vector. Result is accumulated into output.
     // output is scaled by 1/128, then clamped to [-128,128], and finally shifted to [0,255].
     void convolve_14641_row_5x5_16bit( const int16_t* in, uint8_t* out, int w, int h ) {
       assert( w % 16 == 0 && "width must be multiple of 16!" );
-#if defined(USE_SIMD)
-      auto i0 = (const __m128i*)(in);
-      auto i1 = (const __m128i*)(in+1);
-      auto i2 = (const __m128i*)(in+2);
-      auto i3 = (const __m128i*)(in+3);
-      auto i4 = (const __m128i*)(in+4);
-      const auto end_input = (const __m128i*)(in + w*h);
-      const __m128i offs = _mm_set1_epi16( 128 );
-#else
-      auto i0 = (const std::array<int16_t, 8>*)(in);
-      auto i1 = (const std::array<int16_t, 8>*)(in+1);
-      auto i2 = (const std::array<int16_t, 8>*)(in+2);
-      auto i3 = (const std::array<int16_t, 8>*)(in+3);
-      auto i4 = (const std::array<int16_t, 8>*)(in+4);
-      const auto end_input = (const std::array<int16_t, 8>*)(in + w*h);
-      const std::array<int16_t, 8> offs = {128, 128, 128, 128, 128, 128, 128, 128};
-#endif
-      uint8_t* result   = out + 2;
-      for( ; i4 < end_input; result += 16 ) {
-#if defined(USE_SIMD)
-        __m128i result_register_lo, result_register_hi;
-        for( int i=0; i<2; i++ ) {
-          __m128i* result_register = i==0 ? &result_register_lo : &result_register_hi;
-          __m128i i0_register = _mm_loadu_si128(i0);
-          __m128i i1_register = _mm_loadu_si128(i1);
-          __m128i i2_register = _mm_loadu_si128(i2);
-          __m128i i3_register = _mm_loadu_si128(i3);
-          __m128i i4_register = _mm_loadu_si128(i4);
-          *result_register = _mm_setzero_si128();
-          *result_register = _mm_add_epi16( i0_register, *result_register );
-          i1_register      = _mm_add_epi16( i1_register, i1_register  );
-          i1_register      = _mm_add_epi16( i1_register, i1_register  );
-          *result_register = _mm_add_epi16( i1_register, *result_register );
-          i2_register      = _mm_add_epi16( i2_register, i2_register  );
-          *result_register = _mm_add_epi16( i2_register, *result_register );
-          i2_register      = _mm_add_epi16( i2_register, i2_register  );
-          *result_register = _mm_add_epi16( i2_register, *result_register );
-          i3_register      = _mm_add_epi16( i3_register, i3_register  );
-          i3_register      = _mm_add_epi16( i3_register, i3_register  );
-          *result_register = _mm_add_epi16( i3_register, *result_register );
-          *result_register = _mm_add_epi16( i4_register, *result_register );
-          *result_register = _mm_srai_epi16( *result_register, 7 );
-          *result_register = _mm_add_epi16( *result_register, offs );
-
-          i0 += 1; i1 += 1; i2 += 1; i3 += 1; i4 += 1;
-        }
-        pack_16bit_to_8bit_saturate( result_register_lo, result_register_hi, result_register_lo );
-        _mm_storeu_si128( ((__m128i*)( result )), result_register_lo );
-#else
-        std::array<int16_t, 8> result_register_lo, result_register_hi;
-        for( int i=0; i<2; i++ )
+      auto i0 = (const array_8xint16_t*)(in);
+      auto i1 = (const array_8xint16_t*)(in+1);
+      auto i2 = (const array_8xint16_t*)(in+2);
+      auto i3 = (const array_8xint16_t*)(in+3);
+      auto i4 = (const array_8xint16_t*)(in+4);
+      const auto end_input = (const array_8xint16_t*)(in + w*h);
+      const auto offs = filled_array8<array_8xint16_t>(128);
+      for(uint8_t* result = out+2; i4 < end_input; result += 16 )
+      {
+        array_8xint16_t result_registers[2];
+        for(int i=0; i<2; i++, i0++, i1++, i2++, i3++, i4++)
         {
-          const auto result_reg = i==0 ? &result_register_lo : &result_register_hi;
-
-          const auto r1  = add_array_vals(*i1, *i1);
-          const auto r2  = add_array_vals(r1, r1);
-          const auto r3  = add_array_vals(r2, *i0);
-          const auto r4  = add_array_vals(*i2, *i2);
-          const auto r5  = add_array_vals(r4, r3);
-          const auto r6  = add_array_vals(r4, r4);
-          const auto r7  = add_array_vals(r6, r5);
-          const auto r8  = add_array_vals(*i3, *i3);
-          const auto r9 = add_array_vals(r8, r8);
-          const auto r10 = add_array_vals(r9, r7);
-          const auto r11 = add_array_vals(*i4, r10);
-          const auto r12 = rshift_array_vals(r11, 7);
-          *result_reg = add_array_vals(r12, offs);
-
-          i0 += 1; i1 += 1; i2 += 1; i3 += 1; i4 += 1;
+          const auto i1x4  = lshift_array_vals<8>(load_array(i1), 2);
+          const auto i0_4i1  = add_array_vals<8>(load_array(i0), i1x4);
+          const auto i2x2  = lshift_array_vals<8>(load_array(i2), 1);
+          const auto i2x4  = lshift_array_vals<8>(load_array(i2), 2);
+          const auto i2x6  = add_array_vals<8>(i2x2, i2x4);
+          const auto i0_4i1_6i2 = add_array_vals<8>(i0_4i1, i2x6);
+          const auto i3x4 = lshift_array_vals<8>(load_array(i3), 2);
+          const auto i0_4i1_6i2_4i3 = add_array_vals<8>(i0_4i1_6i2, i3x4);
+          const auto i0_4i1_6i2_4i3_i4 = add_array_vals<8>(i0_4i1_6i2_4i3, load_array(i4));
+          const auto scaled = rshift_array_vals<8>(i0_4i1_6i2_4i3_i4, 7);
+          result_registers[i] = add_array_vals<8>(scaled, offs);
         }
-        const auto packed_result = array_pack_16to8(result_register_lo, result_register_hi);
-        *(std::array<uint8_t, 16>*)result = packed_result;
-#endif
+        const auto packed_result = array_pack_16to8<8>(result_registers[0], result_registers[1]);
+        store_array((array_16xuint8_t*)result, packed_result);
       }
     }
 
@@ -266,59 +104,25 @@ namespace filter {
     // output is scaled by 1/128, then clamped to [-128,128], and finally shifted to [0,255].
     void convolve_12021_row_5x5_16bit( const int16_t* in, uint8_t* out, int w, int h ) {
       assert( w % 16 == 0 && "width must be multiple of 16!" );
-#if defined(USE_SIMD)
-      auto i0 = (const __m128i*)(in);
-      auto i1 = (const __m128i*)(in+1);
-      auto i3 = (const __m128i*)(in+3);
-      auto i4 = (const __m128i*)(in+4);
-      const auto end_input = (const __m128i*)(in + w*h);
-      __m128i offs = _mm_set1_epi16( 128 );
-#else
-      auto i0 = (const std::array<int16_t, 8>*)(in);
-      auto i1 = (const std::array<int16_t, 8>*)(in+1);
-      auto i3 = (const std::array<int16_t, 8>*)(in+3);
-      auto i4 = (const std::array<int16_t, 8>*)(in+4);
-      const auto end_input = (const std::array<int16_t, 8>*)(in + w*h);
-      const std::array<int16_t, 8> offs = {128, 128, 128, 128, 128, 128, 128, 128};
-#endif
-      uint8_t* result    = out + 2;
-      for( ; i4 < end_input; result += 16 ) {
-#if defined(USE_SIMD)
-        __m128i result_register_lo, result_register_hi;
-        for( int i=0; i<2; i++ ) {
-          __m128i* result_register = i==0 ? &result_register_lo : &result_register_hi;
-          __m128i i0_register = _mm_loadu_si128(i0);
-          __m128i i1_register = _mm_loadu_si128(i1);
-          __m128i i3_register = _mm_loadu_si128(i3);
-          __m128i i4_register = _mm_loadu_si128(i4);
-          *result_register = _mm_setzero_si128();
-          *result_register = _mm_add_epi16( i0_register,   *result_register );
-          i1_register      = _mm_add_epi16( i1_register, i1_register  );
-          *result_register = _mm_add_epi16( i1_register,   *result_register );
-          i3_register      = _mm_add_epi16( i3_register, i3_register  );
-          *result_register = _mm_sub_epi16( *result_register, i3_register );
-          *result_register = _mm_sub_epi16( *result_register, i4_register );
-          *result_register = _mm_srai_epi16( *result_register, 7 );
-          *result_register = _mm_add_epi16( *result_register, offs );
-
-          i0 += 1; i1 += 1; i3 += 1; i4 += 1;
-        }
-        pack_16bit_to_8bit_saturate( result_register_lo, result_register_hi, result_register_lo );
-        _mm_storeu_si128( ((__m128i*)( result )), result_register_lo );
-#else
-        std::array<int16_t, 8> result_registers[2];
+      auto i0 = (const array_8xint16_t*)(in);
+      auto i1 = (const array_8xint16_t*)(in+1);
+      auto i3 = (const array_8xint16_t*)(in+3);
+      auto i4 = (const array_8xint16_t*)(in+4);
+      const auto end_input = (const array_8xint16_t*)(in + w*h);
+      const auto offs = filled_array8<array_8xint16_t>(128);
+      for(uint8_t* result = out+2; i4 < end_input; result += 16 ) {
+        array_8xint16_t result_registers[2];
         for( int i=0; i<2; i++, i0++, i1++, i3++, i4++) {
-          const auto r1 = add_array_vals(*i1, *i1);
-          const auto r2 = add_array_vals(r1, *i0);
-          const auto r3 = add_array_vals(*i3, *i3);
-          const auto r4 = sub_array_vals(r2, r3);
-          const auto r5 = sub_array_vals(r4, *i4);
-          const auto r6 = rshift_array_vals(r5, 7);
-          result_registers[i] = add_array_vals(r6, offs);
+          const auto r1 = lshift_array_vals<8>(load_array(i1), 1);
+          const auto r2 = add_array_vals<8>(r1, load_array(i0));
+          const auto r3 = lshift_array_vals<8>(load_array(i3), 1);
+          const auto r4 = sub_array_vals<8>(r2, r3);
+          const auto r5 = sub_array_vals<8>(r4, load_array(i4));
+          const auto r6 = rshift_array_vals<8>(r5, 7);
+          result_registers[i] = add_array_vals<8>(r6, offs);
         }
-        const auto packed_result = array_pack_16to8(result_registers[0], result_registers[1]);
-        *(std::array<uint8_t, 16>*)result = packed_result;
-#endif
+        const auto packed_result = array_pack_16to8<8>(result_registers[0], result_registers[1]);
+        store_array((array_16xuint8_t*)result, packed_result);
       }
     }
 
@@ -327,51 +131,24 @@ namespace filter {
     // output is scaled by 1/4, then clamped to [-128,128], and finally shifted to [0,255].
     void convolve_121_row_3x3_16bit( const int16_t* in, uint8_t* out, int w, int h ) {
       assert( w % 16 == 0 && "width must be multiple of 16!" );
-#if defined(USE_SIMD)
-      auto i0 = (const __m128i*)(in);
-      auto i1 = (const __m128i*)(in+1);
-      auto i2 = (const __m128i*)(in+2);
-      __m128i offs = _mm_set1_epi16( 128 );
-#else
-      auto i0 = (const std::array<int16_t, 8>*)(in);
-      auto i1 = (const std::array<int16_t, 8>*)(in+1);
-      auto i2 = (const std::array<int16_t, 8>*)(in+2);
-      const std::array<int16_t, 8> offs = {128, 128, 128, 128, 128, 128, 128, 128};
-#endif
+      auto i0 = (const array_8xint16_t*)(in);
+      auto i1 = (const array_8xint16_t*)(in+1);
+      auto i2 = (const array_8xint16_t*)(in+2);
+      const auto offs = filled_array8<array_8xint16_t>(128);
       uint8_t* result   = out + 1;
       const size_t blocked_loops = (w*h-2)/16;
       for( size_t i=0; i != blocked_loops; i++, result += 16) {
-#if defined(USE_SIMD)
-        __m128i result_registers[2];
-        __m128i i1_register;
-        __m128i i2_register;
-        for (unsigned lh=0; lh<2; lh++, i0++, i1++, i2++)
-        {
-          __m128i* result_register = &result_registers[lh];
-          i1_register        = _mm_loadu_si128(i1);
-          i2_register        = _mm_loadu_si128(i2);
-          *result_register = _mm_loadu_si128(i0);
-          i1_register        = _mm_add_epi16( i1_register, i1_register );
-          *result_register = _mm_add_epi16( i1_register, *result_register );
-          *result_register = _mm_add_epi16( i2_register, *result_register );
-          *result_register = _mm_srai_epi16( *result_register, 2 );
-          *result_register = _mm_add_epi16( *result_register, offs );
-        }
-        pack_16bit_to_8bit_saturate( result_registers[0], result_registers[1], result_registers[0] );
-        _mm_storeu_si128( ((__m128i*)( result )), result_registers[0] );
-#else
-        std::array<int16_t, 8> result_registers[2];
+        array_8xint16_t result_registers[2];
         for (unsigned lh=0; lh<2; lh++, i0++, i1++, i2++)
         {          
-          const auto r1 = add_array_vals(*i1, *i1);
-          const auto r2 = add_array_vals(r1, *i0);
-          const auto r3 = add_array_vals(*i2, r2);
-          const auto r4 = rshift_array_vals(r3, 2);
-          result_registers[lh] = add_array_vals( r4, offs );
+          const auto r1 = lshift_array_vals<8>(load_array(i1), 1);
+          const auto r2 = add_array_vals<8>(r1, load_array(i0));
+          const auto r3 = add_array_vals<8>(load_array(i2), r2);
+          const auto r4 = rshift_array_vals<8>(r3, 2);
+          result_registers[lh] = add_array_vals<8>(r4, offs);
         }
-        const auto packed_result = array_pack_16to8(result_registers[0], result_registers[1]);
-        *(std::array<uint8_t, 16>*)result = packed_result;
-#endif        
+        const auto packed_result = array_pack_16to8<8>(result_registers[0], result_registers[1]);
+        store_array((array_16xuint8_t*)result, packed_result);
       }
     }
     
@@ -380,44 +157,22 @@ namespace filter {
     // output is scaled by 1/4, then clamped to [-128,128], and finally shifted to [0,255].
     void convolve_101_row_3x3_16bit( const int16_t* in, uint8_t* out, int w, int h ) {
       assert( w % 16 == 0 && "width must be multiple of 16!" );
-#if defined(USE_SIMD)
-      auto i0 = (const __m128i*)(in);
-      auto i2 = (const __m128i*)(in+2);
-      const __m128i offs = _mm_set1_epi16( 128 );
-#else
-      auto i0 = (const std::array<int16_t, 8>*)(in);
-      auto i2 = (const std::array<int16_t, 8>*)(in+2);
-      const std::array<int16_t, 8> offs = {128, 128, 128, 128, 128, 128, 128, 128};
-#endif
+      auto i0 = (const array_8xint16_t*)(in);
+      auto i2 = (const array_8xint16_t*)(in+2);
+      const auto offs = filled_array8<array_8xint16_t>(128);
       uint8_t* result    = out + 1;
       const int16_t* const end_input = in + w*h;
       const size_t blocked_loops = (w*h-2)/16;
       for( size_t i=0; i != blocked_loops; i++, result += 16) {
-#if defined(USE_SIMD)
-        __m128i result_registers[2];
-        __m128i i2_register;
+        array_8xint16_t result_registers[2];
         for(unsigned lh=0; lh<2; lh++, i0++, i2++)
         {
-          __m128i* result_register = &result_registers[lh];
-          i2_register = _mm_loadu_si128(i2);
-          *result_register  = _mm_loadu_si128(i0);
-          *result_register  = _mm_sub_epi16( *result_register, i2_register );
-          *result_register  = _mm_srai_epi16( *result_register, 2 );
-          *result_register  = _mm_add_epi16( *result_register, offs );
+          const auto r1 = sub_array_vals<8>(load_array(i0), load_array(i2));
+          const auto r2 = rshift_array_vals<8>(r1, 2);
+          result_registers[lh] = add_array_vals<8>(r2, offs);
         }        
-        pack_16bit_to_8bit_saturate( result_registers[0], result_registers[1], result_registers[0] );
-        _mm_storeu_si128( ((__m128i*)( result )), result_registers[0] );
-#else
-        std::array<int16_t, 8> result_registers[2];
-        for(unsigned lh=0; lh<2; lh++, i0++, i2++)
-        {
-          const auto r1 = sub_array_vals(*i0, *i2);
-          const auto r2 = rshift_array_vals(r1, 2);
-          result_registers[lh] = add_array_vals(r2, offs);
-        }        
-        const auto packed_result = array_pack_16to8(result_registers[0], result_registers[1]);
-        *(std::array<uint8_t, 16>*)result = packed_result;
-#endif
+        const auto packed_result = array_pack_16to8<8>(result_registers[0], result_registers[1]);
+        store_array((array_16xuint8_t*)result, packed_result);
       }
 
       for(auto _i2 = (int16_t*)i2; _i2 < end_input; _i2++, result++) {
@@ -431,249 +186,122 @@ namespace filter {
       memset( out_v, 0, w*h*sizeof(int16_t) );
       assert( w % 16 == 0 && "width must be multiple of 16!" );
       const int w_chunk  = w/16;
-#if defined(USE_SIMD)
-      auto i0        = (__m128i*)( in );
-      auto i1        = (__m128i*)( in ) + w_chunk*1;
-      auto i2        = (__m128i*)( in ) + w_chunk*2;
-      auto i3        = (__m128i*)( in ) + w_chunk*3;
-      auto i4        = (__m128i*)( in ) + w_chunk*4;
-      auto result_h  = (__m128i*)( out_h ) + 4*w_chunk;
-      auto result_v  = (__m128i*)( out_v ) + 4*w_chunk;
-      auto end_input = (__m128i*)( in ) + w_chunk*h;
-      __m128i sixes      = _mm_set1_epi16( 6 );
-      __m128i fours      = _mm_set1_epi16( 4 );
-#else
-      auto i0        = (const std::array<uint8_t, 16>*)( in );
-      auto i1        = (const std::array<uint8_t, 16>*)( in ) + w_chunk*1;
-      auto i2        = (const std::array<uint8_t, 16>*)( in ) + w_chunk*2;
-      auto i3        = (const std::array<uint8_t, 16>*)( in ) + w_chunk*3;
-      auto i4        = (const std::array<uint8_t, 16>*)( in ) + w_chunk*4;
-      auto result_h  = (      std::array<int16_t, 8>*)( out_h ) + 4*w_chunk;
-      auto result_v  = (      std::array<int16_t, 8>*)( out_v ) + 4*w_chunk;
-      auto end_input = (const std::array<uint8_t, 16>*)( in ) + w_chunk*h;
-#endif
+      auto i0              = (const array_16xuint8_t*)( in );
+      auto i1              = (const array_16xuint8_t*)( in ) + w_chunk*1;
+      auto i2              = (const array_16xuint8_t*)( in ) + w_chunk*2;
+      auto i3              = (const array_16xuint8_t*)( in ) + w_chunk*3;
+      auto i4              = (const array_16xuint8_t*)( in ) + w_chunk*4;
+      const auto end_input = (const array_16xuint8_t*)( in ) + w_chunk*h;
+      auto result_h        = (      array_8xint16_t*)( out_h ) + w_chunk*4;
+      auto result_v        = (      array_8xint16_t*)( out_v ) + w_chunk*4;
+      const auto sixes = filled_array8<array_8xint16_t>(6);
+      const auto fours = filled_array8<array_8xint16_t>(4);
       for( ; i4 != end_input; i0++, i1++, i2++, i3++, i4++, result_v+=2, result_h+=2 ) {   
-#if defined(USE_SIMD)
-        __m128i ilo, ihi;
-        unpack_8bit_to_16bit( *i0, ihi, ilo );
-        *result_h     = _mm_add_epi16( ihi, *result_h );
-        *(result_h+1) = _mm_add_epi16( ilo, *(result_h+1) );
-        *result_v     = _mm_add_epi16( *result_v, ihi );
-        *(result_v+1) = _mm_add_epi16( *(result_v+1), ilo );
-        unpack_8bit_to_16bit( *i1, ihi, ilo );
-        *result_h     = _mm_add_epi16( ihi, *result_h );
-        *result_h     = _mm_add_epi16( ihi, *result_h );
-        *(result_h+1) = _mm_add_epi16( ilo, *(result_h+1) );
-        *(result_h+1) = _mm_add_epi16( ilo, *(result_h+1) );
-        ihi = _mm_mullo_epi16( ihi, fours );
-        ilo = _mm_mullo_epi16( ilo, fours );
-        *result_v     = _mm_add_epi16( *result_v, ihi );
-        *(result_v+1) = _mm_add_epi16( *(result_v+1), ilo );
-        unpack_8bit_to_16bit( *i2, ihi, ilo );
-        ihi = _mm_mullo_epi16( ihi, sixes );
-        ilo = _mm_mullo_epi16( ilo, sixes );
-        *result_v     = _mm_add_epi16( *result_v, ihi );
-        *(result_v+1) = _mm_add_epi16( *(result_v+1), ilo );
-        unpack_8bit_to_16bit( *i3, ihi, ilo );
-        *result_h     = _mm_sub_epi16( *result_h, ihi );
-        *result_h     = _mm_sub_epi16( *result_h, ihi );
-        *(result_h+1) = _mm_sub_epi16( *(result_h+1), ilo );
-        *(result_h+1) = _mm_sub_epi16( *(result_h+1), ilo );
-        ihi = _mm_mullo_epi16( ihi, fours );
-        ilo = _mm_mullo_epi16( ilo, fours );
-        *result_v     = _mm_add_epi16( *result_v, ihi );
-        *(result_v+1) = _mm_add_epi16( *(result_v+1), ilo );          
-        unpack_8bit_to_16bit( *i4, ihi, ilo );
-        *result_h     = _mm_sub_epi16( *result_h, ihi );
-        *(result_h+1) = _mm_sub_epi16( *(result_h+1), ilo );
-        *result_v     = _mm_add_epi16( *result_v, ihi );
-        *(result_v+1) = _mm_add_epi16( *(result_v+1), ilo );
-#else
         const auto result_h1 = result_h+1;
         const auto result_v1 = result_v+1;
-        const auto u0 = array_unpack_8to16(*i0);
-        add_array_vals_in_place(*result_h, u0.hi);
-        add_array_vals_in_place(*result_h1, u0.lo);
-        add_array_vals_in_place(*result_v, u0.hi);
-        add_array_vals_in_place(*result_v1, u0.lo);
-        const auto u1 = array_unpack_8to16(*i1);
-        add_array_vals_in_place(*result_h, u1.hi);
-        add_array_vals_in_place(*result_h, u1.hi);
-        add_array_vals_in_place(*result_h1, u1.lo);
-        add_array_vals_in_place(*result_h1, u1.lo);
-        const auto u1_x4 = mul_array_vals(u1, 4);
-        add_array_vals_in_place(*result_v, u1_x4.hi);
-        add_array_vals_in_place(*result_v1, u1_x4.lo);
-        const auto u2 = array_unpack_8to16(*i2);
-        const auto u2_x6 = mul_array_vals(u2, 6);
-        add_array_vals_in_place(*result_v, u2_x6.hi);
-        add_array_vals_in_place(*result_v1, u2_x6.lo);
-        const auto u3 = array_unpack_8to16(*i3);
-        sub_array_vals_in_place(*result_h, u3.hi);
-        sub_array_vals_in_place(*result_h, u3.hi);
-        sub_array_vals_in_place(*result_h1, u3.lo);
-        sub_array_vals_in_place(*result_h1, u3.lo);
-        const auto u3_x4 = mul_array_vals(u3, 4);
-        add_array_vals_in_place(*result_v, u3_x4.hi);
-        add_array_vals_in_place(*result_v1, u3_x4.lo);
-        const auto u4 = array_unpack_8to16(*i4);
-        sub_array_vals_in_place(*result_h, u4.hi);
-        sub_array_vals_in_place(*result_h1, u4.lo);
-        add_array_vals_in_place(*result_v, u4.hi);
-        add_array_vals_in_place(*result_v1, u4.lo);
-#endif
+        const auto u0 = array_unpack_8to16<16>(*i0);
+        add_array_vals_in_place<8>(*result_h, u0.hi);
+        add_array_vals_in_place<8>(*result_h1, u0.lo);
+        add_array_vals_in_place<8>(*result_v, u0.hi);
+        add_array_vals_in_place<8>(*result_v1, u0.lo);
+        const auto u1 = array_unpack_8to16<16>(*i1);
+        add_array_vals_in_place<8>(*result_h, u1.hi);
+        add_array_vals_in_place<8>(*result_h, u1.hi);
+        add_array_vals_in_place<8>(*result_h1, u1.lo);
+        add_array_vals_in_place<8>(*result_h1, u1.lo);
+        const auto u1_x4 = mul_array_vals<8>(u1, fours);
+        add_array_vals_in_place<8>(*result_v, u1_x4.hi);
+        add_array_vals_in_place<8>(*result_v1, u1_x4.lo);
+        const auto u2 = array_unpack_8to16<16>(*i2);
+        const auto u2_x6 = mul_array_vals<8>(u2, sixes);
+        add_array_vals_in_place<8>(*result_v, u2_x6.hi);
+        add_array_vals_in_place<8>(*result_v1, u2_x6.lo);
+        const auto u3 = array_unpack_8to16<16>(*i3);
+        sub_array_vals_in_place<8>(*result_h, u3.hi);
+        sub_array_vals_in_place<8>(*result_h, u3.hi);
+        sub_array_vals_in_place<8>(*result_h1, u3.lo);
+        sub_array_vals_in_place<8>(*result_h1, u3.lo);
+        const auto u3_x4 = mul_array_vals<8>(u3, fours);
+        add_array_vals_in_place<8>(*result_v, u3_x4.hi);
+        add_array_vals_in_place<8>(*result_v1, u3_x4.lo);
+        const auto u4 = array_unpack_8to16<16>(*i4);
+        sub_array_vals_in_place<8>(*result_h, u4.hi);
+        sub_array_vals_in_place<8>(*result_h1, u4.lo);
+        add_array_vals_in_place<8>(*result_v, u4.hi);
+        add_array_vals_in_place<8>(*result_v1, u4.lo);
       }
     }
     
-    // possible that non-sse is better here?
     void convolve_col_p1p1p0m1m1_5x5( const unsigned char* in, int16_t* out, int w, int h ) {
       memset( out, 0, w*h*sizeof(int16_t) );
       using namespace std;
       assert( w % 16 == 0 && "width must be multiple of 16!" );
       const int w_chunk  = w/16;
-#if defined(USE_SIMD)
-      auto i0       = (__m128i*)( in );
-      auto i1       = (__m128i*)( in ) + w_chunk*1;
-      auto i3       = (__m128i*)( in ) + w_chunk*3;
-      auto i4       = (__m128i*)( in ) + w_chunk*4;
-      auto result   = (__m128i*)( out ) + 4*w_chunk;
-      const auto end_input = (__m128i*)( in ) + w_chunk*h;
-#else
-      auto i0       = (const std::array<uint8_t, 16>*)( in );
-      auto i1       = (const std::array<uint8_t, 16>*)( in ) + w_chunk*1;
-      auto i3       = (const std::array<uint8_t, 16>*)( in ) + w_chunk*3;
-      auto i4       = (const std::array<uint8_t, 16>*)( in ) + w_chunk*4;
-      auto result   = (      std::array<int16_t, 8>*)( out ) + 4*w_chunk;
-      const auto end_input = (const std::array<uint8_t, 16>*)( in ) + w_chunk*h;
-#endif
+      auto i0              = (const array_16xuint8_t*)( in );
+      auto i1              = (const array_16xuint8_t*)( in ) + w_chunk*1;
+      auto i3              = (const array_16xuint8_t*)( in ) + w_chunk*3;
+      auto i4              = (const array_16xuint8_t*)( in ) + w_chunk*4;
+      const auto end_input = (const array_16xuint8_t*)( in ) + w_chunk*h;
+      auto result          = (      array_8xint16_t*)( out ) + 4*w_chunk;
       for( ; i4 != end_input; i0++, i1++, i3++, i4++, result+=2 ) {
-#if defined(USE_SIMD)
-        __m128i ilo0, ihi0;
-        unpack_8bit_to_16bit( *i0, ihi0, ilo0 );
-        __m128i ilo1, ihi1;
-        unpack_8bit_to_16bit( *i1, ihi1, ilo1 );
-        *result     = _mm_add_epi16( ihi0, ihi1 );
-        *(result+1) = _mm_add_epi16( ilo0, ilo1 );
-        __m128i ilo, ihi;
-        unpack_8bit_to_16bit( *i3, ihi, ilo );
-        *result     = _mm_sub_epi16( *result, ihi );
-        *(result+1) = _mm_sub_epi16( *(result+1), ilo );
-        unpack_8bit_to_16bit( *i4, ihi, ilo );
-        *result     = _mm_sub_epi16( *result, ihi );
-        *(result+1) = _mm_sub_epi16( *(result+1), ilo );
-#else
-        const auto u0 = array_unpack_8to16(*i0);
-        const auto u1 = array_unpack_8to16(*i1);
-        *result     = add_array_vals(u0.hi, u1.hi);
-        *(result+1) = add_array_vals(u0.lo, u1.lo);
-        const auto u3 = array_unpack_8to16(*i3);
-        sub_array_vals_in_place(*result, u3.hi);
-        sub_array_vals_in_place(*(result+1), u3.lo);
-        const auto u4 = array_unpack_8to16(*i4);
-        sub_array_vals_in_place(*result, u4.hi);
-        sub_array_vals_in_place(*(result+1), u4.lo);
-#endif
+        const auto u0 = array_unpack_8to16<16>(*i0);
+        const auto u1 = array_unpack_8to16<16>(*i1);
+        *result     = add_array_vals<8>(u0.hi, u1.hi);
+        *(result+1) = add_array_vals<8>(u0.lo, u1.lo);
+        const auto u3 = array_unpack_8to16<16>(*i3);
+        sub_array_vals_in_place<8>(*result, u3.hi);
+        sub_array_vals_in_place<8>(*(result+1), u3.lo);
+        const auto u4 = array_unpack_8to16<16>(*i4);
+        sub_array_vals_in_place<8>(*result, u4.hi);
+        sub_array_vals_in_place<8>(*(result+1), u4.lo);
       }
     }
     
     void convolve_row_p1p1p0m1m1_5x5( const int16_t* in, int16_t* out, int w, int h ) {
       assert( w % 16 == 0 && "width must be multiple of 16!" );
-#if defined(USE_SIMD)
-      auto i0 = (const __m128i*)(in);
-      auto i1 = (const __m128i*)(in+1);
-      auto i3 = (const __m128i*)(in+3);
-      auto i4 = (const __m128i*)(in+4);
-      const auto end_input = (const __m128i*)(in + w*h);
-#else
-      auto i0 = (const std::array<int16_t, 8>*)(in);
-      auto i1 = (const std::array<int16_t, 8>*)(in+1);
-      auto i3 = (const std::array<int16_t, 8>*)(in+3);
-      auto i4 = (const std::array<int16_t, 8>*)(in+4);
-      const auto end_input = (const std::array<int16_t, 8>*)(in + w*h);
-#endif
+      auto i0 = (const array_8xint16_t*)(in);
+      auto i1 = (const array_8xint16_t*)(in+1);
+      auto i3 = (const array_8xint16_t*)(in+3);
+      auto i4 = (const array_8xint16_t*)(in+4);
+      const auto end_input = (const array_8xint16_t*)(in + w*h);
       int16_t* result    = out + 2;
       for( ; i4+8 < end_input; i0++, i1++, i3++, i4++, result += 8 ) {
-#if defined(USE_SIMD)
-        __m128i result_register;
-        __m128i i0_register = _mm_loadu_si128(i0);
-        __m128i i1_register = _mm_loadu_si128(i1);
-        __m128i i3_register = _mm_loadu_si128(i3);
-        __m128i i4_register = _mm_loadu_si128(i4);
-        result_register     = _mm_add_epi16( i0_register,     i1_register );
-        result_register     = _mm_sub_epi16( result_register, i3_register );
-        result_register     = _mm_sub_epi16( result_register, i4_register );
-        _mm_storeu_si128( ((__m128i*)( result )), result_register );
-#else
-        const auto r0 = add_array_vals(*i0, *i1);
-        const auto r1 = sub_array_vals(r0,  *i3);
-        const auto r2 = sub_array_vals(r1,  *i4);
-        *(std::array<int16_t, 8>*)result = r2;
-#endif
+        const auto r0 = add_array_vals<8>(load_array(i0), load_array(i1));
+        const auto r1 = sub_array_vals<8>(r0, load_array(i3));
+        const auto r2 = sub_array_vals<8>(r1, load_array(i4));
+        store_array((array_8xint16_t*)result, r2);
       }
     }
     
-    // possible that non-sse is better here?
     void convolve_cols_3x3( const unsigned char* in, int16_t* out_v, int16_t* out_h, int w, int h ) {
       using namespace std;
       assert( w % 16 == 0 && "width must be multiple of 16!" );
       const int w_chunk  = w/16;
-#if defined(USE_SIMD)
-      auto i0        = (__m128i*)( in );
-      auto i1        = (__m128i*)( in ) + w_chunk*1;
-      auto i2        = (__m128i*)( in ) + w_chunk*2;
-      auto result_h  = (__m128i*)( out_h ) + 2*w_chunk;
-      auto result_v  = (__m128i*)( out_v ) + 2*w_chunk;
-      const auto end_input = (__m128i*)( in ) + w_chunk*h;
-#else
-      auto i0        = (const std::array<uint8_t, 16>*)( in );
-      auto i1        = (const std::array<uint8_t, 16>*)( in ) + w_chunk*1;
-      auto i2        = (const std::array<uint8_t, 16>*)( in ) + w_chunk*2;
-      auto result_h  = (      std::array<int16_t, 8>*)( out_h ) + 2*w_chunk;
-      auto result_v  = (      std::array<int16_t, 8>*)( out_v ) + 2*w_chunk;
-      const auto end_input = (const std::array<uint8_t, 16>*)( in ) + w_chunk*h;
-#endif
+      auto i0              = (const array_16xuint8_t*)( in );
+      auto i1              = (const array_16xuint8_t*)( in ) + w_chunk*1;
+      auto i2              = (const array_16xuint8_t*)( in ) + w_chunk*2;
+      const auto end_input = (const array_16xuint8_t*)( in ) + w_chunk*h;
+      auto result_h        = (      array_8xint16_t*)( out_h ) + 2*w_chunk;
+      auto result_v        = (      array_8xint16_t*)( out_v ) + 2*w_chunk;
       for( ; i2 != end_input; i0++, i1++, i2++, result_v+=2, result_h+=2 ) {
-#if defined(USE_SIMD)
-        *result_h     = _mm_setzero_si128();
-        *(result_h+1) = _mm_setzero_si128();
-        *result_v     = _mm_setzero_si128();
-        *(result_v+1) = _mm_setzero_si128();
-        __m128i ilo, ihi;
-        unpack_8bit_to_16bit( *i0, ihi, ilo );
-        *result_h     = _mm_add_epi16( ihi, *result_h );
-        *(result_h+1) = _mm_add_epi16( ilo, *(result_h+1) );
-        *result_v     = _mm_add_epi16( *result_v, ihi );
-        *(result_v+1) = _mm_add_epi16( *(result_v+1), ilo );
-        unpack_8bit_to_16bit( *i1, ihi, ilo );
-        *result_v     = _mm_add_epi16( *result_v, ihi );
-        *(result_v+1) = _mm_add_epi16( *(result_v+1), ilo );
-        *result_v     = _mm_add_epi16( *result_v, ihi );
-        *(result_v+1) = _mm_add_epi16( *(result_v+1), ilo );
-        unpack_8bit_to_16bit( *i2, ihi, ilo );
-        *result_h     = _mm_sub_epi16( *result_h, ihi );
-        *(result_h+1) = _mm_sub_epi16( *(result_h+1), ilo );
-        *result_v     = _mm_add_epi16( *result_v, ihi );
-        *(result_v+1) = _mm_add_epi16( *(result_v+1), ilo );
-#else
-        const auto u0 = array_unpack_8to16(*i0);
+        const auto u0 = array_unpack_8to16<16>(*i0);
         *result_h     = u0.hi;
         *(result_h+1) = u0.lo;
         *result_v     = u0.hi;
         *(result_v+1) = u0.lo;
-        const auto u1 = array_unpack_8to16(*i1);
-        add_array_vals_in_place(*result_v, u1.hi);
-        add_array_vals_in_place(*(result_v+1), u1.lo);
-        add_array_vals_in_place(*result_v, u1.hi);
-        add_array_vals_in_place(*(result_v+1), u1.lo);
-        const auto u2 = array_unpack_8to16(*i2);
-        sub_array_vals_in_place(*result_h, u2.hi);
-        sub_array_vals_in_place(*(result_h+1), u2.lo);
-        add_array_vals_in_place(*result_v, u2.hi);
-        add_array_vals_in_place(*(result_v+1), u2.lo);
-#endif
+        const auto u1 = array_unpack_8to16<16>(*i1);
+        add_array_vals_in_place<8>(*result_v, u1.hi);
+        add_array_vals_in_place<8>(*(result_v+1), u1.lo);
+        add_array_vals_in_place<8>(*result_v, u1.hi);
+        add_array_vals_in_place<8>(*(result_v+1), u1.lo);
+        const auto u2 = array_unpack_8to16<16>(*i2);
+        sub_array_vals_in_place<8>(*result_h, u2.hi);
+        sub_array_vals_in_place<8>(*(result_h+1), u2.lo);
+        add_array_vals_in_place<8>(*result_v, u2.hi);
+        add_array_vals_in_place<8>(*(result_v+1), u2.lo);
       }
     }
-  };
+  }
   
   void sobel3x3( const uint8_t* in, uint8_t* out_v, uint8_t* out_h, int w, int h ) {
     int16_t* temp_h = (int16_t*)( _mm_malloc( w*h*sizeof( int16_t ), 16 ) );

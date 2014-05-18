@@ -4,8 +4,8 @@ project (SfM)
 
 cmake_policy(SET CMP0015 NEW)
 set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -O3")
-add_definitions(-DUSE_SIMD)
+set(CMAKE_CXX_FLAGS "-std=c++11 -Wall")
+#add_definitions(-DUSE_SIMD)
 
 if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL arm)
 # arm
@@ -46,9 +46,9 @@ file(GLOB SRC_FILES "demo/*.cc")
 add_library(sfmdemo ${SRC_FILES};shader_srcs.generated.hh)
 target_link_libraries(sfmdemo viso2 png ${extra_libs})
 
-set(src_file "main.cpp")
-set(exe_name "sfm")
-add_executable(${exe_name} ${src_file})
-target_link_libraries(${exe_name} sfmdemo)
+add_executable(sfm main.cpp)
+target_link_libraries(sfm sfmdemo)
 
+add_executable(simd_test test/simd.cpp)
+target_link_libraries(simd_test sfmdemo)
 

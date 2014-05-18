@@ -889,25 +889,10 @@ void Matcher::createIndexVector (int32_t* m,int32_t n,vector<int32_t> *k,const i
   }
 }
 
-std::pair<uint16_t,uint16_t> sum_abs_diff(uint8_t a[16], uint8_t b[16])
-{
-  auto abs_diff = [a, b](unsigned i) -> uint16_t {return a[i] > b[i] ? a[i]-b[i] : b[i]-a[i];};
-  std::pair<uint16_t,uint16_t> res;
-
-  for (unsigned i=0; i<8; i++)
-  {
-    res.first += abs_diff(i);
-  }
-  for (unsigned i=8; i<16; i++)
-  {
-    res.second += abs_diff(i);
-  }
-  return res;
-}
-
 inline void Matcher::findMatch (int32_t* m1,const int32_t &i1,int32_t* m2,const int32_t &step_size,vector<int32_t> *k2,
                                 const int32_t &u_bin_num,const int32_t &v_bin_num,const int32_t &stat_bin,
                                 int32_t& min_ind,int32_t stage,bool flow,bool use_prior,double u_,double v_) {
+  using namespace simd;
   
   // init and load image coordinates + feature
   min_ind          = 0;
@@ -916,13 +901,8 @@ inline void Matcher::findMatch (int32_t* m1,const int32_t &i1,int32_t* m2,const 
   int32_t v1       = *(m1+step_size*i1+1);
   int32_t c        = *(m1+step_size*i1+3);
 
-#if defined(USE_SIMD)
-  __m128i xmm1     = _mm_load_si128((__m128i*)(m1+step_size*i1+4));
-  __m128i xmm2     = _mm_load_si128((__m128i*)(m1+step_size*i1+8));
-#else
-  uint8_t *xmm1    = (uint8_t*)(m1+step_size*i1+4);
-  uint8_t *xmm2    = (uint8_t*)(m1+step_size*i1+8);
-#endif
+  array_16xuint8_t xmm1 = load_aligned_array((array_16xuint8_t*)(m1+step_size*i1+4));
+  array_16xuint8_t xmm2 = load_aligned_array((array_16xuint8_t*)(m1+step_size*i1+8));
   
   float u_min,u_max,v_min,v_max;
   
@@ -961,21 +941,9 @@ inline void Matcher::findMatch (int32_t* m1,const int32_t &i1,int32_t* m2,const 
         int32_t u2   = *(m2+step_size*(*i2_it)+0);
         int32_t v2   = *(m2+step_size*(*i2_it)+1);
         if (u2>=u_min && u2<=u_max && v2>=v_min && v2<=v_max) {
-
-#if defined(USE_SIMD)
-          __m128i xmm3 = _mm_load_si128((__m128i*)(m2+step_size*(*i2_it)+4));
-          __m128i xmm4 = _mm_load_si128((__m128i*)(m2+step_size*(*i2_it)+8));                    
-          xmm3 = _mm_sad_epu8 (xmm1,xmm3);
-          xmm4 = _mm_sad_epu8 (xmm2,xmm4);
-          xmm4 = _mm_add_epi16(xmm3,xmm4);
-          double cost = (double)(_mm_extract_epi16(xmm4,0)+_mm_extract_epi16(xmm4,4));
-#else
-          uint8_t *xmm3 = (uint8_t*)(m2+step_size*(*i2_it)+4);
-          uint8_t *xmm4 = (uint8_t*)(m2+step_size*(*i2_it)+8);
-          auto sad1 = sum_abs_diff(xmm1,xmm3);
-          auto sad2 = sum_abs_diff(xmm2,xmm4);
-          double cost = double(sad1.first + sad1.second + sad2.first + sad2.second);
-#endif
+          array_16xuint8_t xmm3 = load_aligned_array((array_16xuint8_t*)(m2+step_size*(*i2_it)+4));
+          array_16xuint8_t xmm4 = load_aligned_array((array_16xuint8_t*)(m2+step_size*(*i2_it)+8));
+          double cost = (double)sad_array<16>(xmm1,xmm2, xmm3,xmm4);
           
           if (u_>=0 && v_>=0) {
             double du = (double)u2-u_;
@@ -1017,7 +985,7 @@ void Matcher::matching (int32_t *m1p,int32_t *m2p,int32_t *m1c,int32_t *m2c,
   int32_t i1p,i2p,i1c,i2c,i1c2,i1p2;
   int32_t u1p,v1p,u2p,v2p,u1c,v1c,u2c,v2c;
   
-  double t00,t01,t02,t03,t10,t11,t12,t13,t20,t21,t22,t23;
+  double t00=0, t01=0, t02=0, t03=0, t10=0, t11=0, t12=0, t13=0, t20=0, t21=0, t22=0, t23=0;
   if (Tr_delta) {
     t00 = Tr_delta->val[0][0];
     t01 = Tr_delta->val[0][1];
@@ -1414,6 +1382,7 @@ bool Matcher::parabolicFitting(const uint8_t* I1_du,const uint8_t* I1_dv,const i
                                float       &u2,float       &v2,
                                Matrix At,Matrix AtA,
                                uint8_t* desc_buffer) {
+  using namespace simd;
 
   // check if parabolic fitting is feasible (descriptors are within margin)
   if (u2-3<margin || u2+3>dims2[0]-1-margin || v2-3<margin || v2+3>dims2[1]-1-margin)
@@ -1422,29 +1391,16 @@ bool Matcher::parabolicFitting(const uint8_t* I1_du,const uint8_t* I1_dv,const i
   // compute reference descriptor
   computeSmallDescriptor(I1_du,I1_dv,dims1[2],(int32_t)u1,(int32_t)v1,desc_buffer);
 
-#if defined(USE_SIMD)
-  __m128i xmm1,xmm2;
-  xmm1 = _mm_load_si128((__m128i*)(desc_buffer));
-#else
-  std::array<uint8_t, 16> xmm1;
-  std::copy(desc_buffer, desc_buffer+16, xmm1.begin());
-#endif
-  
+  array_16xuint8_t xmm1 = load_aligned_array((array_16xuint8_t*)(desc_buffer));
+
   // compute cost matrix
   int32_t cost[49];
   for (int32_t dv=0; dv<7; dv++) {
     for (int32_t du=0; du<7; du++) {
       computeSmallDescriptor(I2_du,I2_dv,dims2[2],(int32_t)u2+du-3,(int32_t)v2+dv-3,desc_buffer);
 
-#if defined(USE_SIMD)
-      xmm2 = _mm_load_si128((__m128i*)(desc_buffer));
-      xmm2 = _mm_sad_epu8(xmm1,xmm2);
-      cost[dv*7+du] = _mm_extract_epi16(xmm2,0)+_mm_extract_epi16(xmm2,4);
-#else
-      auto sad = sum_abs_diff(xmm1.data(), desc_buffer);
-      cost[dv*7+du] = sad.first + sad.second;
-#endif
-
+      array_16xuint8_t xmm2 = load_aligned_array((array_16xuint8_t*)(desc_buffer));
+      cost[dv*7+du] = sad_array<16>(xmm1, xmm2);
     }
   }
   
@@ -1502,6 +1458,7 @@ void Matcher::relocateMinimum(const uint8_t* I1_du,const uint8_t* I1_dv,const in
                               const float &u1,const float &v1,
                               float       &u2,float       &v2,
                               uint8_t* desc_buffer) {
+  using namespace simd;
 
   // check if parabolic fitting is feasible (descriptors are within margin)
   if (u2-2<margin || u2+2>dims2[0]-1-margin || v2-2<margin || v2+2>dims2[1]-1-margin)
@@ -1510,13 +1467,7 @@ void Matcher::relocateMinimum(const uint8_t* I1_du,const uint8_t* I1_dv,const in
   // compute reference descriptor
   computeSmallDescriptor(I1_du,I1_dv,dims1[2],(int32_t)u1,(int32_t)v1,desc_buffer);
 
-#if defined(USE_SIMD)
-  __m128i xmm1,xmm2;
-  xmm1 = _mm_load_si128((__m128i*)(desc_buffer));
-#else
-  std::array<uint8_t, 16> xmm1;
-  std::copy(desc_buffer, desc_buffer+16, xmm1.begin());
-#endif
+  array_16xuint8_t xmm1 = load_aligned_array((array_16xuint8_t*)(desc_buffer));
   
   // compute cost matrix
   int32_t cost[25];
@@ -1524,14 +1475,8 @@ void Matcher::relocateMinimum(const uint8_t* I1_du,const uint8_t* I1_dv,const in
     for (int32_t du=0; du<5; du++) {
       computeSmallDescriptor(I2_du,I2_dv,dims2[2],(int32_t)u2+du-2,(int32_t)v2+dv-2,desc_buffer);
 
-#if defined(USE_SIMD)
-      xmm2 = _mm_load_si128((__m128i*)(desc_buffer));
-      xmm2 = _mm_sad_epu8(xmm1,xmm2);
-      cost[dv*5+du] = _mm_extract_epi16(xmm2,0)+_mm_extract_epi16(xmm2,4);
-#else
-      auto sad = sum_abs_diff(xmm1.data(), desc_buffer);
-      cost[dv*5+du] = sad.first + sad.second;
-#endif
+      array_16xuint8_t xmm2 = load_aligned_array((array_16xuint8_t*)(desc_buffer));
+      cost[dv*5+du] = sad_array<16>(xmm1, xmm2);
     }
   }
   
