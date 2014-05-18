@@ -7,15 +7,21 @@
 
 namespace simd
 {
+#ifdef __SSE3__
+    #include <emmintrin.h>
+    #include <pmmintrin.h>
+    struct __m128i_int16x8 {__m128i val;};
+    struct __m128i_uint8x16 {__m128i val;};
+#endif
+#ifdef __ARM_NEON__
+    #include <arm_neon.h>
+#endif
 
 #if defined(USE_SIMD)
     #if defined(__SSE3__)
-        #include <emmintrin.h>
-        #include <pmmintrin.h>
-        typedef __m128i array_8xint16_t;
-        typedef __m128i array_16xuint8_t;
+        typedef __m128i_int16x8 array_8xint16_t;
+        typedef __m128i_uint8x16 array_16xuint8_t;
     #elif defined(__ARM_NEON__)
-        #include <arm_neon.h>
         typedef int16x8_t array_8xint16_t;
         typedef uint8x16_t array_16xuint8_t;
     #else
@@ -37,19 +43,13 @@ std::array<int16_t, N> add_array_vals(const std::array<int16_t, N> &a, const std
     return res;
 }
     #ifdef __SSE3__
-    template<size_t N>
-    __m128i add_array_vals(const __m128i &a, const __m128i &b);
-    template<>
-    inline __m128i add_array_vals<8>(const __m128i &a, const __m128i &b)
+    inline __m128i_int16x8 __attribute__((__always_inline__)) add_array_vals(const __m128i_int16x8 &a, const __m128i_int16x8 &b)
     {
-        return _mm_add_epi16(a,b);
+        return __m128i_int16x8{_mm_add_epi16(a.val, b.val)};
     }
     #endif
     #ifdef __ARM_NEON__
-    template<size_t N>
-    int16x8_t add_array_vals(const int16x8_t &a, const int16x8_t &b);
-    template<>
-    inline int16x8_t add_array_vals<8>(const int16x8_t &a, const int16x8_t &b)
+    inline int16x8_t __attribute__((__always_inline__)) add_array_vals(const int16x8_t &a, const int16x8_t &b)
     {
         return vaddq_s16(a,b);
     }
@@ -66,19 +66,13 @@ std::array<int16_t, N> sub_array_vals(const std::array<int16_t, N> &a, const std
     return res;
 }
     #ifdef __SSE3__
-    template<size_t N>
-    __m128i sub_array_vals(const __m128i &a, const __m128i &b);
-    template<>
-    inline __m128i sub_array_vals<8>(const __m128i &a, const __m128i &b)
+    inline __m128i_int16x8 __attribute__((__always_inline__)) sub_array_vals(const __m128i_int16x8 &a, const __m128i_int16x8 &b)
     {
-            return _mm_sub_epi16(a,b);
+        return __m128i_int16x8{_mm_sub_epi16(a.val, b.val)};
     }
     #endif
     #ifdef __ARM_NEON__
-    template<size_t N>
-    int16x8_t sub_array_vals(const int16x8_t &a, const int16x8_t &b);
-    template<>
-    inline int16x8_t sub_array_vals<8>(const int16x8_t &a, const int16x8_t &b)
+    inline int16x8_t __attribute__((__always_inline__)) sub_array_vals(const int16x8_t &a, const int16x8_t &b)
     {
             return vsubq_s16(a,b);
     }
@@ -93,19 +87,13 @@ void add_array_vals_in_place(std::array<int16_t, N> &a, const std::array<int16_t
     }
 }
     #ifdef __SSE3__
-    template<size_t N>
-    void add_array_vals_in_place(__m128i &a, const __m128i &b);
-    template<>
-    inline void add_array_vals_in_place<8>(__m128i &a, const __m128i &b)
+    inline void __attribute__((__always_inline__)) add_array_vals_in_place(__m128i_int16x8 &a, const __m128i_int16x8 &b)
     {
-        a = _mm_add_epi16(a,b);
+        a.val = _mm_add_epi16(a.val, b.val);
     }
     #endif
     #ifdef __ARM_NEON__
-    template<size_t N>
-    void add_array_vals_in_place(int16x8_t &a, const int16x8_t &b);
-    template<>
-    inline void add_array_vals_in_place<8>(int16x8_t &a, const int16x8_t &b)
+    inline void __attribute__((__always_inline__)) add_array_vals_in_place(int16x8_t &a, const int16x8_t &b)
     {
         a = vaddq_s16(a,b);
     }
@@ -120,19 +108,13 @@ void sub_array_vals_in_place(std::array<int16_t, N> &a, const std::array<int16_t
     }
 }
     #ifdef __SSE3__
-    template<size_t N>
-    void sub_array_vals_in_place(__m128i &a, const __m128i &b);
-    template<>
-    inline void sub_array_vals_in_place<8>(__m128i &a, const __m128i &b)
+    inline void __attribute__((__always_inline__)) sub_array_vals_in_place(__m128i_int16x8 &a, const __m128i_int16x8 &b)
     {
-        a = _mm_sub_epi16(a,b);
+        a.val = _mm_sub_epi16(a.val, b.val);
     }
     #endif
     #ifdef __ARM_NEON__
-    template<size_t N>
-    void sub_array_vals_in_place(int16x8_t &a, const int16x8_t &b);
-    template<>
-    inline void sub_array_vals_in_place<8>(int16x8_t &a, const int16x8_t &b)
+    inline void __attribute__((__always_inline__)) sub_array_vals_in_place(int16x8_t &a, const int16x8_t &b)
     {
         a = vsubq_s16(a,b);
     }
@@ -147,8 +129,8 @@ struct unpacked16arrays_t
 #ifdef __SSE3__
 struct __m128i_pair
 {
-    __m128i hi;
-    __m128i lo;
+    __m128i_int16x8 hi;
+    __m128i_int16x8 lo;
 };
 #endif
 #ifdef __ARM_NEON__
@@ -174,22 +156,16 @@ unpacked16arrays_t<N> mul_array_vals(const unpacked16arrays_t<N> &a, const std::
     return res;
 }
     #ifdef __SSE3__
-    template<size_t N>
-    __m128i_pair mul_array_vals(const __m128i_pair &a, const __m128i &b);
-    template<>
-    inline __m128i_pair mul_array_vals<8>(const __m128i_pair &a, const __m128i &b)
+    inline __m128i_pair __attribute__((__always_inline__)) mul_array_vals(const __m128i_pair &a, const __m128i_int16x8 &b)
     {
         __m128i_pair res;
-        res.hi = _mm_mullo_epi16(a.hi, b);
-        res.lo = _mm_mullo_epi16(a.lo, b);
+        res.hi.val = _mm_mullo_epi16(a.hi.val, b.val);
+        res.lo.val = _mm_mullo_epi16(a.lo.val, b.val);
         return res;
     }
     #endif
     #ifdef __ARM_NEON__
-    template<size_t N>
-    int16x8_pair_t mul_array_vals(const int16x8_pair_t &a, const int16x8_t &b);
-    template<>
-    inline int16x8_pair_t mul_array_vals<8>(const int16x8_pair_t &a, const int16x8_t &b)
+    inline int16x8_pair_t __attribute__((__always_inline__)) mul_array_vals(const int16x8_pair_t &a, const int16x8_t &b)
     {
         int16x8_pair_t res;
         res.hi = vmulq_s16(a.hi, b);
@@ -198,9 +174,10 @@ unpacked16arrays_t<N> mul_array_vals(const unpacked16arrays_t<N> &a, const std::
     }
     #endif
 
-template<size_t N>
-std::array<int16_t, N> rshift_array_vals(const std::array<int16_t, N> &a, const unsigned shift_n)
+template<int shift_n>
+std::array<int16_t, 8> rshift_array_vals(const std::array<int16_t, 8> &a)
 {
+    static const unsigned N = 8;
     std::array<int16_t, N> res;
     for (size_t i=0; i<N; i++)
     {
@@ -209,27 +186,24 @@ std::array<int16_t, N> rshift_array_vals(const std::array<int16_t, N> &a, const 
     return res;
 }
     #ifdef __SSE3__
-    template<size_t N>
-    __m128i rshift_array_vals(const __m128i &a, const int b);
-    template<>
-    inline __m128i rshift_array_vals<8>(const __m128i &a, const int b)
+    template<int shift_n>
+    inline __m128i_int16x8 __attribute__((__always_inline__)) rshift_array_vals(const __m128i_int16x8 &a)
     {
-        return _mm_srai_epi16(a,b);
+        return __m128i_int16x8{_mm_srai_epi16(a.val, shift_n)};
     }
     #endif
     #ifdef __ARM_NEON__
-    template<size_t N>
-    int16x8_t rshift_array_vals(const int16x8_t &a, const int b);
-    template<>
-    inline int16x8_t rshift_array_vals<8>(const int16x8_t &a, const int b)
+    template<int shift_n>
+    inline int16x8_t __attribute__((__always_inline__)) rshift_array_vals(const int16x8_t &a)
     {
-        return vshrq_n_s16(a,b);
+        return vshrq_n_s16(a, shift_n);
     }
     #endif
 
-template<size_t N>
-std::array<int16_t, N> lshift_array_vals(const std::array<int16_t, N> &a, const unsigned shift_n)
+template<int shift_n>
+std::array<int16_t, 8> lshift_array_vals(const std::array<int16_t, 8> &a)
 {
+    static const unsigned N = 8;
     std::array<int16_t, N> res;
     for (size_t i=0; i<N; i++)
     {
@@ -238,21 +212,17 @@ std::array<int16_t, N> lshift_array_vals(const std::array<int16_t, N> &a, const 
     return res;
 }
     #ifdef __SSE3__
-    template<size_t N>
-    __m128i lshift_array_vals(const __m128i &a, const int b);
-    template<>
-    inline __m128i lshift_array_vals<8>(const __m128i &a, const int b)
+    template<int shift_n>
+    inline __m128i_int16x8 __attribute__((__always_inline__)) lshift_array_vals(const __m128i_int16x8 &a)
     {
-        return _mm_slli_epi16(a,b);
+        return __m128i_int16x8{_mm_slli_epi16(a.val, shift_n)};
     }
     #endif
     #ifdef __ARM_NEON__
-    template<size_t N>
-    int16x8_t lshift_array_vals(const int16x8_t &a, const int b);
-    template<>
-    inline int16x8_t lshift_array_vals<8>(const int16x8_t &a, const int b)
+    template<int shift_n>
+    inline int16x8_t __attribute__((__always_inline__)) lshift_array_vals(const int16x8_t &a)
     {
-        return vshlq_n_s16(a,b);
+        return vshlq_n_s16(a, shift_n);
     }
     #endif
 
@@ -272,19 +242,13 @@ std::array<uint8_t, 2*N> array_pack_16to8(const std::array<int16_t, N> &a, const
     return res;
 }
     #ifdef __SSE3__
-    template<size_t N>
-    __m128i array_pack_16to8(const __m128i &a, const __m128i &b);
-    template<>
-    inline __m128i array_pack_16to8<8>(const __m128i &a, const __m128i &b)
+    inline __m128i_uint8x16 __attribute__((__always_inline__)) array_pack_16to8(const __m128i_int16x8 &a, const __m128i_int16x8 &b)
     {
-        return _mm_packus_epi16(a, b);
+        return __m128i_uint8x16{_mm_packus_epi16(a.val, b.val)};
     }
     #endif
     #ifdef __ARM_NEON__
-    template<size_t N>
-    uint8x16_t array_pack_16to8(const int16x8_t &a, const int16x8_t &b);
-    template<>
-    inline uint8x16_t array_pack_16to8<8>(const int16x8_t &a, const int16x8_t &b)
+    inline uint8x16_t __attribute__((__always_inline__)) array_pack_16to8(const int16x8_t &a, const int16x8_t &b)
     {
         return vcombine_u8(vqmovun_s16(a), vqmovun_s16(b));
     }
@@ -306,23 +270,17 @@ unpacked16arrays_t<N/2> array_unpack_8to16(const std::array<uint8_t, N> &a)
     return res;
 }
     #ifdef __SSE3__
-    template<size_t N>
-    __m128i_pair array_unpack_8to16(const __m128i a);
-    template<>
-    inline __m128i_pair array_unpack_8to16<16>(const __m128i a)
+    inline __m128i_pair __attribute__((__always_inline__)) array_unpack_8to16(const __m128i_uint8x16 a)
     {
         __m128i_pair res;
         __m128i zero = _mm_setzero_si128();
-        res.hi = _mm_unpacklo_epi8(a, zero);
-        res.lo = _mm_unpackhi_epi8(a, zero);
+        res.hi.val = _mm_unpacklo_epi8(a.val, zero);
+        res.lo.val = _mm_unpackhi_epi8(a.val, zero);
         return res;
     }
     #endif
     #ifdef __ARM_NEON__
-    template<size_t N>
-    int16x8_pair_t array_unpack_8to16(const uint8x16_t a);
-    template<>
-    inline int16x8_pair_t array_unpack_8to16<16>(const uint8x16_t a)
+    inline int16x8_pair_t __attribute__((__always_inline__)) array_unpack_8to16(const uint8x16_t a)
     {
         int16x8_pair_t res;
         res.hi = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(a)));
@@ -340,14 +298,14 @@ T filled_array8(int16_t val)
 
     #ifdef __SSE3__
     template<>
-    inline __m128i filled_array8<__m128i>(int16_t val)
+    inline __m128i_int16x8 __attribute__((__always_inline__)) filled_array8<__m128i_int16x8>(int16_t val)
     {
-        return _mm_set1_epi16(val);
+        return __m128i_int16x8{_mm_set1_epi16(val)};
     }
     #endif
     #ifdef __ARM_NEON__
     template<>
-    inline int16x8_t filled_array8<int16x8_t>(int16_t val)
+    inline int16x8_t __attribute__((__always_inline__)) filled_array8<int16x8_t>(int16_t val)
     {
         return vmovq_n_s16(val);
     }
@@ -360,14 +318,14 @@ T load_array(const T *ptr)
 }
     #ifdef __SSE3__
     template<>
-    inline __m128i load_array<__m128i>(const __m128i *ptr)
+    inline __m128i_int16x8 __attribute__((__always_inline__)) load_array<__m128i_int16x8>(const __m128i_int16x8 *ptr)
     {
-        return _mm_loadu_si128(ptr);
+        return __m128i_int16x8{_mm_loadu_si128((const __m128i*)ptr)};
     }
     #endif
     #ifdef __ARM_NEON__
     template<>
-    inline int16x8_t load_array<int16x8_t>(const int16x8_t *ptr)
+    inline int16x8_t __attribute__((__always_inline__)) load_array<int16x8_t>(const int16x8_t *ptr)
     {
         return vld1q_s16((const int16_t*)ptr);
     }
@@ -380,14 +338,14 @@ T load_aligned_array(const T *ptr)
 }
     #ifdef __SSE3__
     template<>
-    inline __m128i load_aligned_array<__m128i>(const __m128i *ptr)
+    inline __m128i_int16x8 __attribute__((__always_inline__)) load_aligned_array<__m128i_int16x8>(const __m128i_int16x8 *ptr)
     {
-        return _mm_load_si128(ptr);
+        return __m128i_int16x8{_mm_load_si128((const __m128i*)ptr)};
     }
     #endif
     #ifdef __ARM_NEON__
     template<>
-    inline int16x8_t load_aligned_array<int16x8_t>(const int16x8_t *ptr)
+    inline int16x8_t __attribute__((__always_inline__)) load_aligned_array<int16x8_t>(const int16x8_t *ptr)
     {
         return vld1q_s16((const int16_t*)ptr);
     }
@@ -400,19 +358,24 @@ void store_array(T *const ptr, const T &val)
 }
     #ifdef __SSE3__
     template<>
-    inline void store_array<__m128i>(__m128i *const ptr, const __m128i &val)
+    inline void __attribute__((__always_inline__)) store_array<__m128i_int16x8>(__m128i_int16x8 *const ptr, const __m128i_int16x8 &val)
     {
-        _mm_storeu_si128(ptr, val);
+        _mm_storeu_si128((__m128i*)ptr, val.val);
+    }
+    template<>
+    inline void __attribute__((__always_inline__)) store_array<__m128i_uint8x16>(__m128i_uint8x16 *const ptr, const __m128i_uint8x16 &val)
+    {
+        _mm_storeu_si128((__m128i*)ptr, val.val);
     }
     #endif
     #ifdef __ARM_NEON__
     template<>
-    inline void store_array<int16x8_t>(int16x8_t *const ptr, const int16x8_t &val)
+    inline void __attribute__((__always_inline__)) store_array<int16x8_t>(int16x8_t *const ptr, const int16x8_t &val)
     {
         vst1q_s16((int16_t*)ptr, val);
     }
     template<>
-    inline void store_array<uint8x16_t>(uint8x16_t *const ptr, const uint8x16_t &val)
+    inline void __attribute__((__always_inline__)) store_array<uint8x16_t>(uint8x16_t *const ptr, const uint8x16_t &val)
     {
         vst1q_u8((uint8_t*)ptr, val);
     }
@@ -430,20 +393,14 @@ int32_t sad_array(const std::array<uint8_t, N> &a, const std::array<uint8_t, N> 
     return sum;
 }
     #ifdef __SSE3__
-    template <size_t N>
-    int32_t sad_array(const __m128i &a, const __m128i &b);
-    template <>
-    inline int32_t sad_array<16>(const __m128i &a, const __m128i &b)
+    inline int32_t __attribute__((__always_inline__)) sad_array(const __m128i_uint8x16 &a, const __m128i_uint8x16 &b)
     {
-        __m128i sad1 = _mm_sad_epu8 (a,b);
+        __m128i sad1 = _mm_sad_epu8 (a.val, b.val);
         return _mm_extract_epi16(sad1,0) + _mm_extract_epi16(sad1,4);
     }
     #endif
     #ifdef __ARM_NEON__
-    template <size_t N>
-    int32_t sad_array(const uint8x16_t &a, const uint8x16_t &b);
-    template <>
-    inline int32_t sad_array<16>(const uint8x16_t &a, const uint8x16_t &b)
+    inline int32_t __attribute__((__always_inline__)) sad_array(const uint8x16_t &a, const uint8x16_t &b)
     {
         const uint8x16_t abs_diff = vabdq_u8 (a,b);
         const uint16x8_t sum1 = vpaddlq_u8(abs_diff);
@@ -466,22 +423,16 @@ int32_t sad_array(const std::array<uint8_t, N> &a0, const std::array<uint8_t, N>
     return sum;
 }
     #ifdef __SSE3__
-    template <size_t N>
-    int32_t sad_array(const __m128i &a0, const __m128i &a1, const __m128i &b0, const __m128i &b1);
-    template <>
-    inline int32_t sad_array<16>(const __m128i &a0, const __m128i &a1, const __m128i &b0, const __m128i &b1)
+    inline int32_t __attribute__((__always_inline__)) sad_array(const __m128i_uint8x16 &a0, const __m128i_uint8x16 &a1, const __m128i_uint8x16 &b0, const __m128i_uint8x16 &b1)
     {
-        __m128i sad1 = _mm_sad_epu8 (a0,b0);
-        __m128i sad2 = _mm_sad_epu8 (a1,b1);
+        __m128i sad1 = _mm_sad_epu8 (a0.val, b0.val);
+        __m128i sad2 = _mm_sad_epu8 (a1.val, b1.val);
         __m128i sad3 = _mm_add_epi16(sad1,sad2);
         return _mm_extract_epi16(sad3,0) + _mm_extract_epi16(sad3,4);
     }
     #endif
     #ifdef __ARM_NEON__
-    template <size_t N>
-    int32_t sad_array(const uint8x16_t &a0, const uint8x16_t &a1, const uint8x16_t &b0, const uint8x16_t &b1);
-    template <>
-    inline int32_t sad_array<16>(const uint8x16_t &a0, const uint8x16_t &a1, const uint8x16_t &b0, const uint8x16_t &b1)
+    inline int32_t __attribute__((__always_inline__)) sad_array(const uint8x16_t &a0, const uint8x16_t &a1, const uint8x16_t &b0, const uint8x16_t &b1)
     {
         const uint8x16_t abs_diff1 = vabdq_u8(a0,b0);
         const uint16x8_t sum1 = vpaddlq_u8(abs_diff1);

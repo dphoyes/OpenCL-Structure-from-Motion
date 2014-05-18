@@ -68,36 +68,36 @@ int main()
         const array_8xint16_t array16_2s = to_simd(array16_2);
 
         assert(
-                    add_array_vals<8>(array16_0, array16_1) ==
-         to_array16(add_array_vals<8>(array16_0s, array16_1s))
+                    add_array_vals(array16_0, array16_1) ==
+         to_array16(add_array_vals(array16_0s, array16_1s))
         );
         assert(
-                    sub_array_vals<8>(array16_0, array16_1) ==
-         to_array16(sub_array_vals<8>(array16_0s, array16_1s))
+                    sub_array_vals(array16_0, array16_1) ==
+         to_array16(sub_array_vals(array16_0s, array16_1s))
         );
 
         assert(
-                    rshift_array_vals<8>(array16_0, 2) ==
-         to_array16(rshift_array_vals<8>(array16_0s, 2))
+                    rshift_array_vals<2>(array16_0) ==
+         to_array16(rshift_array_vals<2>(array16_0s))
         );
         assert(
-                    lshift_array_vals<8>(array16_0, 2) ==
-         to_array16(lshift_array_vals<8>(array16_0s, 2))
+                    lshift_array_vals<2>(array16_0) ==
+         to_array16(lshift_array_vals<2>(array16_0s))
         );
 
         assert(
-                    array_pack_16to8<8>(array16_0, array16_1) ==
-         to_array8(array_pack_16to8<8>(array16_0s, array16_1s))
+                    array_pack_16to8(array16_0, array16_1) ==
+         to_array8(array_pack_16to8(array16_0s, array16_1s))
         );
 
-        auto unpacked = array_unpack_8to16<16>(array8_0);
-        auto unpackeds = array_unpack_8to16<16>(array8_0s);
+        auto unpacked = array_unpack_8to16(array8_0);
+        auto unpackeds = array_unpack_8to16(array8_0s);
 
         assert(unpacked.hi == to_array16(unpackeds.hi));
         assert(unpacked.lo == to_array16(unpackeds.lo));
 
-        auto mul = mul_array_vals<8>(unpacked, array16_2);
-        auto muls = mul_array_vals<8>(unpackeds, array16_2s);
+        auto mul = mul_array_vals(unpacked, array16_2);
+        auto muls = mul_array_vals(unpackeds, array16_2s);
 
         assert(mul.hi == to_array16(muls.hi));
         assert(mul.lo == to_array16(muls.lo));
@@ -127,8 +127,8 @@ int main()
         assert(store_loc16 == to_array16(store_loc16s));
         assert(store_loc8 == to_array8(store_loc8s));
 
-        assert(sad_array<16>(array8_0, array8_1) == sad_array<16>(array8_0s, array8_1s));
-        assert(sad_array<16>(array8_0, array8_1, array8_2, array8_3) == sad_array<16>(array8_0s, array8_1s, array8_2s, array8_3s));
+        assert(sad_array(array8_0, array8_1) == sad_array(array8_0s, array8_1s));
+        assert(sad_array(array8_0, array8_1, array8_2, array8_3) == sad_array(array8_0s, array8_1s, array8_2s, array8_3s));
 
     }
 

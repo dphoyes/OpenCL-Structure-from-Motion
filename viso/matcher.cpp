@@ -943,7 +943,7 @@ inline void Matcher::findMatch (int32_t* m1,const int32_t &i1,int32_t* m2,const 
         if (u2>=u_min && u2<=u_max && v2>=v_min && v2<=v_max) {
           array_16xuint8_t xmm3 = load_aligned_array((array_16xuint8_t*)(m2+step_size*(*i2_it)+4));
           array_16xuint8_t xmm4 = load_aligned_array((array_16xuint8_t*)(m2+step_size*(*i2_it)+8));
-          double cost = (double)sad_array<16>(xmm1,xmm2, xmm3,xmm4);
+          double cost = (double)sad_array(xmm1,xmm2, xmm3,xmm4);
           
           if (u_>=0 && v_>=0) {
             double du = (double)u2-u_;
@@ -1400,7 +1400,7 @@ bool Matcher::parabolicFitting(const uint8_t* I1_du,const uint8_t* I1_dv,const i
       computeSmallDescriptor(I2_du,I2_dv,dims2[2],(int32_t)u2+du-3,(int32_t)v2+dv-3,desc_buffer);
 
       array_16xuint8_t xmm2 = load_aligned_array((array_16xuint8_t*)(desc_buffer));
-      cost[dv*7+du] = sad_array<16>(xmm1, xmm2);
+      cost[dv*7+du] = sad_array(xmm1, xmm2);
     }
   }
   
@@ -1476,7 +1476,7 @@ void Matcher::relocateMinimum(const uint8_t* I1_du,const uint8_t* I1_dv,const in
       computeSmallDescriptor(I2_du,I2_dv,dims2[2],(int32_t)u2+du-2,(int32_t)v2+dv-2,desc_buffer);
 
       array_16xuint8_t xmm2 = load_aligned_array((array_16xuint8_t*)(desc_buffer));
-      cost[dv*5+du] = sad_array<16>(xmm1, xmm2);
+      cost[dv*5+du] = sad_array(xmm1, xmm2);
     }
   }
   
