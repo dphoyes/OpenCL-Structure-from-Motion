@@ -248,7 +248,7 @@ void VisualOdometryStereo::computeResidualsAndJacobian(vector<double> &tr,vector
   // loop variables
   double X1p,Y1p,Z1p;
   double X1c,Y1c,Z1c,X2c;
-  double X1cd,Y1cd,Z1cd;
+  double X1cd=0,Y1cd=0,Z1cd=0;
 
   // for all observations do
   for (int32_t i=0; i<(int32_t)active.size(); i++) {

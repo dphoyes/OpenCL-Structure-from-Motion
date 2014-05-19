@@ -592,7 +592,7 @@ void Matrix::svd(Matrix &U2,Matrix &W,Matrix &V) {
   FLOAT* w   = (FLOAT*)malloc(n*sizeof(FLOAT));
   FLOAT* rv1 = (FLOAT*)malloc(n*sizeof(FLOAT));
 
-  int32_t flag,i,its,j,jj,k,l,nm;
+  int32_t flag,i,its,j,jj,k,l=0,nm=0;
   FLOAT   anorm,c,f,g,h,s,scale,x,y,z;
 
   g = scale = anorm = 0.0; // Householder reduction to bidiagonal form.

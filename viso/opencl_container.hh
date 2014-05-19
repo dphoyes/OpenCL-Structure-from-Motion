@@ -43,6 +43,16 @@ public:
             buff(context, flags, size),
             size(size)
         {}
+
+        Buffer& operator=(const Buffer& rhs)
+        {
+            if (this != &rhs)
+            {
+                buff = rhs.buff;
+                size = rhs.size;
+            }
+            return *this;
+        }
     };
 
      OpenCLContainer(cl_device_type device_type, unsigned n_work_groups, unsigned work_group_size)
@@ -115,6 +125,7 @@ public:
         {
             throw std::runtime_error("No device found.\n");
         }
+        std::cout << "CL_DEVICE_MAX_WORK_GROUP_SIZE: " << device.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() << std::endl;
     }
 
     void makeProgram(const std::string &program_name, const std::string &program_source)

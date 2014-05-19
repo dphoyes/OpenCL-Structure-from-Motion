@@ -13,16 +13,26 @@ private:
     cl::Kernel kernel_get_inlier;
 
     cl::Event p_matched_write_event;
+    cl::Event copy_inlier_mask_event;
 
+    OpenCLContainer::Buffer buff_p_matched;
+    OpenCLContainer::Buffer buff_inlier_mask;
+    OpenCLContainer::Buffer buff_best_inlier_mask;
+    OpenCLContainer::Buffer buff_fund_mat;
+    OpenCLContainer::Buffer buff_counts;
+
+    size_t work_group_size;
+    size_t n_work_groups;
+    size_t global_size;
 
     Matrix                       ransacEstimateF(const std::vector<Matcher::p_match> &p_matched) override;
-    virtual std::vector<int32_t> getInlier (const std::vector<Matcher::p_match> &p_matched,Matrix &F) override;
+    uint32_t get_inlier_count(Matrix &F);
 
 public:
     VisualOdometryMono_CL (parameters param, std::shared_ptr<OpenCLContainer> cl_container)
         :   VisualOdometryMono (param)
         ,   cl_container (cl_container)
-        ,   kernel_get_inlier (cl_container->getKernel("inlier.cl", "kernel_xy"))
+        ,   kernel_get_inlier (cl_container->getKernel("inlier.cl", "find_inliers"))
     {}
 
 };

@@ -11,41 +11,62 @@
           int i2c;     // feature index (for tracking)
         };
 
-__kernel void kernel_xy(
+__kernel void find_inliers(
         __global const struct p_match_t *p_matched, // 0
         __global const double *fund_mat, // 1
-        __global char *inlier_mask, // 2
-        double thresh // 3
+        __global uchar *inlier_mask, // 2
+        double thresh, // 3
+        uint p_matched_size, // 4
+        __global ushort *counts // 5
         )
 {
     uint x = get_global_id(0);
 
-    // extract fundamental matrix
-    double f00 = fund_mat[0*3+0]; double f01 = fund_mat[0*3+1]; double f02 = fund_mat[0*3+2];
-    double f10 = fund_mat[1*3+0]; double f11 = fund_mat[1*3+1]; double f12 = fund_mat[1*3+2];
-    double f20 = fund_mat[2*3+0]; double f21 = fund_mat[2*3+1]; double f22 = fund_mat[2*3+2];
+    if (x < p_matched_size)
+    {
+        // extract fundamental matrix
+        float f00 = fund_mat[0*3+0]; float f01 = fund_mat[0*3+1]; float f02 = fund_mat[0*3+2];
+        float f10 = fund_mat[1*3+0]; float f11 = fund_mat[1*3+1]; float f12 = fund_mat[1*3+2];
+        float f20 = fund_mat[2*3+0]; float f21 = fund_mat[2*3+1]; float f22 = fund_mat[2*3+2];
 
-    // extract matches
-    double u1 = p_matched[x].u1p;
-    double v1 = p_matched[x].v1p;
-    double u2 = p_matched[x].u1c;
-    double v2 = p_matched[x].v1c;
+        // extract matches
+        float u1 = p_matched[x].u1p;
+        float v1 = p_matched[x].v1p;
+        float u2 = p_matched[x].u1c;
+        float v2 = p_matched[x].v1c;
 
-    // F*x1
-    double Fx1u = f00*u1+f01*v1+f02;
-    double Fx1v = f10*u1+f11*v1+f12;
-    double Fx1w = f20*u1+f21*v1+f22;
+        // F*x1
+        float Fx1u = f00*u1+f01*v1+f02;
+        float Fx1v = f10*u1+f11*v1+f12;
+        float Fx1w = f20*u1+f21*v1+f22;
 
-    // F'*x2
-    double Ftx2u = f00*u2+f10*v2+f20;
-    double Ftx2v = f01*u2+f11*v2+f21;
+        // F'*x2
+        float Ftx2u = f00*u2+f10*v2+f20;
+        float Ftx2v = f01*u2+f11*v2+f21;
 
-    // x2'*F*x1
-    double x2tFx1 = u2*Fx1u+v2*Fx1v+Fx1w;
+        // x2'*F*x1
+        float x2tFx1 = u2*Fx1u+v2*Fx1v+Fx1w;
 
-    // sampson distance
-    double d = x2tFx1*x2tFx1 / (Fx1u*Fx1u+Fx1v*Fx1v+Ftx2u*Ftx2u+Ftx2v*Ftx2v);
+        // sampson distance
+        float d = x2tFx1*x2tFx1 / (Fx1u*Fx1u+Fx1v*Fx1v+Ftx2u*Ftx2u+Ftx2v*Ftx2v);
 
-    // check threshold
-    inlier_mask[x] = fabs(d)<thresh ? 1 : -1;
+        // check threshold
+        inlier_mask[x] = fabs(d) < thresh;
+    }
+
+    mem_fence(CLK_GLOBAL_MEM_FENCE);
+
+    if (get_local_id(0) == 0)
+    {
+        const uint start_i = get_global_id(0);
+        const uint end_i = min(convert_uint(get_global_id(0) + get_local_size(0)), p_matched_size);
+
+        uint count = 0;
+        for (uint i=start_i; i < end_i; i++)
+        {
+            count += inlier_mask[i];
+        }
+
+        counts[get_group_id(0)] = count;
+    }
 }
