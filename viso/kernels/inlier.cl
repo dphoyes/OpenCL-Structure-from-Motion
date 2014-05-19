@@ -1,17 +1,17 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
 __kernel void find_inliers(
-        __global const float *match_u1p,      // 0
-        __global const float *match_v1p,      // 1
-        __global const float *match_u1c,      // 2
-        __global const float *match_v1c,      // 3
-        __global const double *fund_mat,      // 4
-        __global uchar *inlier_mask,          // 5
-        float thresh,                        // 6
-        uint p_matched_size,                  // 7
-        __global ushort *counts,               // 8
-        __local float *f,                      // 9
-        __local ushort *counts_tmp             // 10
+        __global const float *match_u1p,   // 0
+        __global const float *match_v1p,   // 1
+        __global const float *match_u1c,   // 2
+        __global const float *match_v1c,   // 3
+        __global const double *fund_mat,   // 4
+        __global uchar *inlier_mask,       // 5
+        float thresh,                      // 6
+        uint p_matched_size,               // 7
+        __global ushort *counts,           // 8
+        __local float *f,                  // 9
+        __local ushort *counts_tmp         // 10
         )
 {
     uint x = get_global_id(0);
@@ -65,27 +65,18 @@ __kernel void find_inliers(
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    // const uint pyramid_height = log2(get_local_size(0));
-    // uint pyramid_width = get_local_size(0);
+    for (uint stride = get_local_size(0)/2; stride > 0; stride >>= 1)
+    {
+        if (get_local_id(0) < stride)
+        {
+            counts_tmp[get_local_id(0)] += counts_tmp[get_local_id(0) + stride];
+        }
 
-    // for (unsigned l=0; l < pyramid_height; l++)
-    // {
-    //     pyramid_width /= 2;
-    //     if (get_local_id(0) < pyramid_width)
-    //     {
-    //         counts_tmp[get_local_id(0)]
-    //     }
-    // }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
 
     if (get_local_id(0) == 0)
     {
-        uint count = 0;
-        for (uint i=0; i < get_local_size(0); i++)
-        // for (uint i=get_global_id(0); i < get_global_id(0)+get_local_size(0); i++)
-        {
-            count += counts_tmp[i];
-        }
-
-        counts[get_group_id(0)] = count;
+        counts[get_group_id(0)] = counts_tmp[0];
     }
 }
