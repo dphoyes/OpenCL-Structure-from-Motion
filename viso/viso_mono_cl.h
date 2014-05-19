@@ -11,6 +11,7 @@ private:
     const std::shared_ptr<OpenCLContainer> cl_container;
 
     cl::Kernel kernel_get_inlier;
+    cl::Kernel kernel_sum;
 
     cl::Event copy_inlier_mask_event;
 
@@ -31,6 +32,7 @@ public:
         :   VisualOdometryMono (param)
         ,   cl_container (cl_container)
         ,   kernel_get_inlier (cl_container->getKernel("inlier.cl", "find_inliers"))
+        ,   kernel_sum (cl_container->getKernel("inlier.cl", "sum"))
     {}
 
 };
