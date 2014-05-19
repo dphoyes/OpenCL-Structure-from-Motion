@@ -7,19 +7,27 @@ __kernel void find_inliers(
         __global const float *match_v1c,      // 3
         __global const double *fund_mat,      // 4
         __global uchar *inlier_mask,          // 5
-        double thresh,                        // 6
+        float thresh,                        // 6
         uint p_matched_size,                  // 7
-        __global ushort *counts               // 8
+        __global ushort *counts,               // 8
+        __local float *f                      // 9
         )
 {
     uint x = get_global_id(0);
 
+    if (get_local_id(0) < 9)
+    {
+        f[get_local_id(0)] = fund_mat[get_local_id(0)];
+    }
+
+    mem_fence(CLK_LOCAL_MEM_FENCE);
+
     if (x < p_matched_size)
     {
         // extract fundamental matrix
-        float f00 = fund_mat[0*3+0]; float f01 = fund_mat[0*3+1]; float f02 = fund_mat[0*3+2];
-        float f10 = fund_mat[1*3+0]; float f11 = fund_mat[1*3+1]; float f12 = fund_mat[1*3+2];
-        float f20 = fund_mat[2*3+0]; float f21 = fund_mat[2*3+1]; float f22 = fund_mat[2*3+2];
+        float f00 = f[0]; float f01 = f[1]; float f02 = f[2];
+        float f10 = f[3]; float f11 = f[4]; float f12 = f[5];
+        float f20 = f[6]; float f21 = f[7]; float f22 = f[8];
 
         // extract matches
         float u1 = match_u1p[x];
