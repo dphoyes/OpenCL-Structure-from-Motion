@@ -41,6 +41,7 @@ Matrix VisualOdometryMono_CL::ransacEstimateF(const vector<Matcher::p_match> &p_
     kernel_get_inlier.setArg(7, uint32_t(p_matched.size()));
     kernel_get_inlier.setArg(8, buff_counts.buff);
     kernel_get_inlier.setArg(9, 9*sizeof(cl_float), nullptr);
+    kernel_get_inlier.setArg(10, work_group_size*sizeof(cl_ushort), nullptr);
 
     cl::Event match_u1p_write_event = cl_container->writeToBuffer(match_u1p.data(), buff_match_u1p);
     cl::Event match_v1p_write_event = cl_container->writeToBuffer(match_v1p.data(), buff_match_v1p);

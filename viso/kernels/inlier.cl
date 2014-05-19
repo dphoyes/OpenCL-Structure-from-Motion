@@ -10,7 +10,8 @@ __kernel void find_inliers(
         float thresh,                        // 6
         uint p_matched_size,                  // 7
         __global ushort *counts,               // 8
-        __local float *f                      // 9
+        __local float *f,                      // 9
+        __local ushort *counts_tmp             // 10
         )
 {
     uint x = get_global_id(0);
@@ -20,8 +21,9 @@ __kernel void find_inliers(
         f[get_local_id(0)] = fund_mat[get_local_id(0)];
     }
 
-    mem_fence(CLK_LOCAL_MEM_FENCE);
+    barrier(CLK_LOCAL_MEM_FENCE);
 
+    uchar bit;
     if (x < p_matched_size)
     {
         // extract fundamental matrix
@@ -51,20 +53,37 @@ __kernel void find_inliers(
         float d = x2tFx1*x2tFx1 / (Fx1u*Fx1u+Fx1v*Fx1v+Ftx2u*Ftx2u+Ftx2v*Ftx2v);
 
         // check threshold
-        inlier_mask[x] = fabs(d) < thresh;
+        bit = fabs(d) < thresh;
+        inlier_mask[x] = bit;
+    }
+    else
+    {
+        bit = 0;
     }
 
-    mem_fence(CLK_GLOBAL_MEM_FENCE);
+    counts_tmp[get_local_id(0)] = bit;
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    // const uint pyramid_height = log2(get_local_size(0));
+    // uint pyramid_width = get_local_size(0);
+
+    // for (unsigned l=0; l < pyramid_height; l++)
+    // {
+    //     pyramid_width /= 2;
+    //     if (get_local_id(0) < pyramid_width)
+    //     {
+    //         counts_tmp[get_local_id(0)]
+    //     }
+    // }
 
     if (get_local_id(0) == 0)
     {
-        const uint start_i = get_global_id(0);
-        const uint end_i = min(convert_uint(get_global_id(0) + get_local_size(0)), p_matched_size);
-
         uint count = 0;
-        for (uint i=start_i; i < end_i; i++)
+        for (uint i=0; i < get_local_size(0); i++)
+        // for (uint i=get_global_id(0); i < get_global_id(0)+get_local_size(0); i++)
         {
-            count += inlier_mask[i];
+            count += counts_tmp[i];
         }
 
         counts[get_group_id(0)] = count;
