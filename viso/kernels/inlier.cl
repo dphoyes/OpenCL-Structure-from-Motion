@@ -1,23 +1,15 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
-        struct p_match_t {
-          float   u1p,v1p; // u,v-coordinates in previous left  image
-          int i1p;     // feature index (for tracking)
-          float   u2p,v2p; // u,v-coordinates in previous right image
-          int i2p;     // feature index (for tracking)
-          float   u1c,v1c; // u,v-coordinates in current  left  image
-          int i1c;     // feature index (for tracking)
-          float   u2c,v2c; // u,v-coordinates in current  right image
-          int i2c;     // feature index (for tracking)
-        };
-
 __kernel void find_inliers(
-        __global const struct p_match_t *p_matched, // 0
-        __global const double *fund_mat, // 1
-        __global uchar *inlier_mask, // 2
-        double thresh, // 3
-        uint p_matched_size, // 4
-        __global ushort *counts // 5
+        __global const float *match_u1p,      // 0
+        __global const float *match_v1p,      // 1
+        __global const float *match_u1c,      // 2
+        __global const float *match_v1c,      // 3
+        __global const double *fund_mat,      // 4
+        __global uchar *inlier_mask,          // 5
+        double thresh,                        // 6
+        uint p_matched_size,                  // 7
+        __global ushort *counts               // 8
         )
 {
     uint x = get_global_id(0);
@@ -30,10 +22,10 @@ __kernel void find_inliers(
         float f20 = fund_mat[2*3+0]; float f21 = fund_mat[2*3+1]; float f22 = fund_mat[2*3+2];
 
         // extract matches
-        float u1 = p_matched[x].u1p;
-        float v1 = p_matched[x].v1p;
-        float u2 = p_matched[x].u1c;
-        float v2 = p_matched[x].v1c;
+        float u1 = match_u1p[x];
+        float v1 = match_v1p[x];
+        float u2 = match_u1c[x];
+        float v2 = match_v1c[x];
 
         // F*x1
         float Fx1u = f00*u1+f01*v1+f02;

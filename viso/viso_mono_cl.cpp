@@ -8,21 +8,49 @@ Matrix VisualOdometryMono_CL::ransacEstimateF(const vector<Matcher::p_match> &p_
     n_work_groups = (p_matched.size() + work_group_size - 1)/work_group_size;
     global_size = n_work_groups * work_group_size;
 
-    buff_p_matched = OpenCLContainer::Buffer(cl_container->context, CL_MEM_READ_ONLY, p_matched.size()*sizeof(Matcher::p_match));
+    std::vector<float> match_u1p(p_matched.size());
+    std::vector<float> match_v1p(p_matched.size());
+    std::vector<float> match_u1c(p_matched.size());
+    std::vector<float> match_v1c(p_matched.size());
+
+    for (unsigned i=0; i<p_matched.size(); i++)
+    {
+        match_u1p[i] = p_matched[i].u1p;
+        match_v1p[i] = p_matched[i].v1p;
+        match_u1c[i] = p_matched[i].u1c;
+        match_v1c[i] = p_matched[i].v1c;
+    }
+
+    OpenCLContainer::Buffer buff_match_u1p (cl_container->context, CL_MEM_READ_ONLY, p_matched.size()*sizeof(float));
+    OpenCLContainer::Buffer buff_match_v1p (cl_container->context, CL_MEM_READ_ONLY, p_matched.size()*sizeof(float));
+    OpenCLContainer::Buffer buff_match_u1c (cl_container->context, CL_MEM_READ_ONLY, p_matched.size()*sizeof(float));
+    OpenCLContainer::Buffer buff_match_v1c (cl_container->context, CL_MEM_READ_ONLY, p_matched.size()*sizeof(float));
+
     buff_fund_mat = OpenCLContainer::Buffer(cl_container->context, CL_MEM_READ_ONLY, 9*sizeof(double));
     buff_inlier_mask = OpenCLContainer::Buffer(cl_container->context, CL_MEM_WRITE_ONLY, p_matched.size()*sizeof(char));
     buff_counts = OpenCLContainer::Buffer(cl_container->context, CL_MEM_WRITE_ONLY, n_work_groups*sizeof(uint16_t));
     buff_best_inlier_mask = OpenCLContainer::Buffer(cl_container->context, CL_MEM_WRITE_ONLY, buff_inlier_mask.size);
 
-    kernel_get_inlier.setArg(0, buff_p_matched.buff);
-    kernel_get_inlier.setArg(1, buff_fund_mat.buff);
-    kernel_get_inlier.setArg(2, buff_inlier_mask.buff);
-    kernel_get_inlier.setArg(3, param.inlier_threshold);
-    kernel_get_inlier.setArg(4, uint32_t(p_matched.size()));
-    kernel_get_inlier.setArg(5, buff_counts.buff);
+    kernel_get_inlier.setArg(0, buff_match_u1p.buff);
+    kernel_get_inlier.setArg(1, buff_match_v1p.buff);
+    kernel_get_inlier.setArg(2, buff_match_u1c.buff);
+    kernel_get_inlier.setArg(3, buff_match_v1c.buff);
+    kernel_get_inlier.setArg(4, buff_fund_mat.buff);
+    kernel_get_inlier.setArg(5, buff_inlier_mask.buff);
+    kernel_get_inlier.setArg(6, param.inlier_threshold);
+    kernel_get_inlier.setArg(7, uint32_t(p_matched.size()));
+    kernel_get_inlier.setArg(8, buff_counts.buff);
 
-    p_matched_write_event = cl_container->writeToBuffer(p_matched.data(), buff_p_matched);
-    copy_inlier_mask_event = p_matched_write_event;
+    cl::Event match_u1p_write_event = cl_container->writeToBuffer(match_u1p.data(), buff_match_u1p);
+    cl::Event match_v1p_write_event = cl_container->writeToBuffer(match_v1p.data(), buff_match_v1p);
+    cl::Event match_u1c_write_event = cl_container->writeToBuffer(match_u1c.data(), buff_match_u1c);
+    cl::Event match_v1c_write_event = cl_container->writeToBuffer(match_v1c.data(), buff_match_v1c);
+
+    {
+        std::vector<cl::Event> wait_events {match_u1p_write_event, match_v1p_write_event, match_u1c_write_event, match_v1c_write_event};
+        cl::WaitForEvents(wait_events);
+    }
+    copy_inlier_mask_event = match_u1p_write_event;
 
     // initial RANSAC estimate of F
     Matrix F;
@@ -48,8 +76,10 @@ Matrix VisualOdometryMono_CL::ransacEstimateF(const vector<Matcher::p_match> &p_
     std::vector<cl::Event> inlier_mask_read_deps {copy_inlier_mask_event};
     cl::Event inlier_mask_read_event; cl_container->queue.enqueueReadBuffer(buff_best_inlier_mask.buff, CL_FALSE, 0, buff_best_inlier_mask.size, inlier_mask.data(), &inlier_mask_read_deps, &inlier_mask_read_event);
 
-    std::vector<cl::Event> wait_events {inlier_mask_read_event};
-    cl::WaitForEvents(wait_events);
+    {
+        std::vector<cl::Event> wait_events {inlier_mask_read_event};
+        cl::WaitForEvents(wait_events);
+    }
 
     inliers.clear();
 
@@ -84,7 +114,7 @@ uint32_t VisualOdometryMono_CL::get_inlier_count(Matrix &F)
     cl::NDRange globalSize (global_size);
     cl::NDRange localSize (work_group_size);
 
-    std::vector<cl::Event> kernel_deps {p_matched_write_event, fund_mat_write_event, copy_inlier_mask_event};
+    std::vector<cl::Event> kernel_deps {fund_mat_write_event, copy_inlier_mask_event};
     cl::Event get_inlier_complete_event; cl_container->queue.enqueueNDRangeKernel(kernel_get_inlier, offset, globalSize, localSize, &kernel_deps, &get_inlier_complete_event);
 
     std::vector<uint16_t> inlier_counts(n_work_groups);

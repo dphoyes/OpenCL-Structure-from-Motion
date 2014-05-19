@@ -12,10 +12,8 @@ private:
 
     cl::Kernel kernel_get_inlier;
 
-    cl::Event p_matched_write_event;
     cl::Event copy_inlier_mask_event;
 
-    OpenCLContainer::Buffer buff_p_matched;
     OpenCLContainer::Buffer buff_inlier_mask;
     OpenCLContainer::Buffer buff_best_inlier_mask;
     OpenCLContainer::Buffer buff_fund_mat;
