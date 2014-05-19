@@ -78,3 +78,32 @@ __kernel void sum(
         out[get_group_id(0)] = tmp[0];
     }
 }
+
+__kernel void update_best_inliers(
+        __global const uchar *inliers,  // 0
+        __global const ushort *counts,  // 1
+        const uint n_counts,            // 2
+        const uint p_matched_size,      // 3
+        __global uchar *best_inliers,   // 4
+        __global ushort *best_count,    // 5
+        __local ushort *tmp             // 6
+    )
+{
+    ushort count = 0;
+    for (unsigned i=0; i<n_counts; i++)
+    {
+        count += counts[i];
+    }
+
+    if (count > best_count[get_group_id(0)] && get_global_id(0) < p_matched_size)
+    {
+        best_inliers[get_global_id(0)] = inliers[get_global_id(0)];
+    }
+
+    barrier(0);
+
+    if (count > best_count[get_group_id(0)] && get_local_id(0) == 0)
+    {
+        best_count[get_group_id(0)] = count;
+    }
+}
