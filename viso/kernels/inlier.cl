@@ -96,15 +96,15 @@ __kernel void update_best_inliers(
         count += counts[i];
     }
 
-    if (count > best_count[get_group_id(0)] && get_global_id(0) < p_matched_size)
+    if (count > best_count[get_global_id(0)] && get_global_id(0) < p_matched_size)
     {
         best_inliers[get_global_id(0)] = inliers[get_global_id(0)];
     }
 
-    barrier(0);
+//    barrier(0);
 
-    if (count > best_count[get_group_id(0)] && get_local_id(0) == 0)
+    if (count > best_count[get_global_id(0)])
     {
-        best_count[get_group_id(0)] = count;
+        best_count[get_global_id(0)] = count;
     }
 }
