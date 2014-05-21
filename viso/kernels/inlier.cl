@@ -1,17 +1,18 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
 __kernel void find_inliers(
-        __global const float *match_u1p,   // 0
-        __global const float *match_v1p,   // 1
-        __global const float *match_u1c,   // 2
-        __global const float *match_v1c,   // 3
-        const uint p_matched_size,         // 4
-        const float thresh,                // 5
-        __global const double *fund_mat,   // 6
-        __global uchar *inlier_mask,       // 7
-        __local float *f                   // 8
+        __global const float *match_u1p,
+        __global const float *match_v1p,
+        __global const float *match_u1c,
+        __global const float *match_v1c,
+        const uint p_matched_size,
+        const float thresh,
+        __global const double *fund_mat,
+        __global uchar *inlier_mask
     )
 {
+    __local float f[9];
+
     if (get_local_id(0) < 9)
     {
         f[get_local_id(0)] = fund_mat[get_local_id(0)];
@@ -53,10 +54,10 @@ __kernel void find_inliers(
 }
 
 __kernel void sum(
-        __global const uchar *in,           // 0
-        __global ushort *out,               // 1
-        const uint len,                    // 2
-        __local ushort *tmp               // 3
+        __global const uchar *in,
+        __global ushort *out,
+        const uint len,
+        __local ushort *tmp
     )
 {
     tmp[get_local_id(0)] = (get_global_id(0) < len) ? in[get_global_id(0)] : 0;
@@ -80,13 +81,13 @@ __kernel void sum(
 }
 
 __kernel void update_best_inliers(
-        __global const uchar *inliers,  // 0
-        __global const ushort *counts,  // 1
-        const uint n_counts,            // 2
-        const uint p_matched_size,      // 3
-        __global uchar *best_inliers,   // 4
-        __global ushort *best_count,    // 5
-        __local ushort *tmp             // 6
+        __global const uchar *inliers,
+        __global const ushort *counts,
+        const uint n_counts,
+        const uint p_matched_size,
+        __global uchar *best_inliers,
+        __global ushort *best_count,
+        __local ushort *tmp
     )
 {
     ushort count = 0;

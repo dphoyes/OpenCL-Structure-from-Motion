@@ -1,7 +1,6 @@
 #include <viso_mono.h>
 #include <viso_mono_cl.h>
 #include <reconstruction.h>
-#include "opencl_container.hh"
 #include "kernel_srcs.generated.hh"
 
 
@@ -18,7 +17,7 @@ class StructureFromMotion
     // frame's camera coordinates to the current frame's camera coordinates
     Matrix Tr_total = Matrix::eye(4);
 
-    std::shared_ptr<OpenCLContainer> cl_container;
+    std::unique_ptr<OpenCL::Container> cl_container;
 
 public:
 
@@ -31,12 +30,12 @@ public:
         if (use_opencl)
         {
 #ifdef __arm__
-            cl_container.reset(new FPGAOpenCLContainer);
+            cl_container.reset(new OpenCL::FPGAContainer);
 #else
-            cl_container.reset(new GPUOpenCLContainer);
+            cl_container.reset(new OpenCL::GPUContainer);
 #endif
             cl_container->init(KERNEL_SRCS);
-            viso.reset(new VisualOdometryMono_CL(params, cl_container));
+            viso.reset(new VisualOdometryMono_CL(params, *cl_container));
         }
         else
         {
