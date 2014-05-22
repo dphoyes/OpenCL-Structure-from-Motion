@@ -12,8 +12,9 @@ private:
     OpenCL::Kernel kernel_update_inliers;
 
     const unsigned n_matches;
+    const unsigned iters_per_batch;
     const size_t work_group_size = 128;
-    const size_t n_match_groups;
+    const size_t cl_groups_per_iter;
     const size_t cl_n_matches;
     const unsigned n_counts = 2;
 
@@ -49,28 +50,29 @@ private:
     }
 
 public:
-    CLInlierFinder(const vector<Matcher::p_match> &p_matched, OpenCL::Container &cl_container, float inlier_threshold)
+    CLInlierFinder(const vector<Matcher::p_match> &p_matched, OpenCL::Container &cl_container, unsigned iters_per_batch, float inlier_threshold)
         :   cl_container (cl_container)
         ,   kernel_get_inlier (cl_container.getKernel("inlier.cl", "find_inliers"))
         ,   kernel_sum (cl_container.getKernel("inlier.cl", "sum"))
         ,   kernel_update_inliers (cl_container.getKernel("inlier.cl", "update_best_inliers"))
         ,   n_matches (p_matched.size())
-        ,   n_match_groups ((n_matches + work_group_size - 1)/work_group_size)
-        ,   cl_n_matches (n_match_groups * work_group_size)
+        ,   iters_per_batch (iters_per_batch)
+        ,   cl_groups_per_iter ((n_matches + work_group_size - 1)/work_group_size)
+        ,   cl_n_matches (cl_groups_per_iter * work_group_size)
         ,   buff_match_u1p (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_match_v1p (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_match_u1c (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_match_v1c (cl_container, CL_MEM_READ_ONLY, n_matches)
-        ,   buff_fund_mat (cl_container, CL_MEM_READ_ONLY, 9)
-        ,   buff_inlier_mask (cl_container, CL_MEM_READ_WRITE, n_matches)
+        ,   buff_fund_mat (cl_container, CL_MEM_READ_ONLY, 9*iters_per_batch)
+        ,   buff_inlier_mask (cl_container, CL_MEM_READ_WRITE, cl_n_matches*iters_per_batch)
         ,   buff_counts (cl_container, CL_MEM_READ_WRITE, n_counts)
         ,   buff_best_inlier_mask (cl_container, CL_MEM_READ_WRITE, n_matches)
-        ,   buff_best_count (cl_container, CL_MEM_READ_WRITE, n_match_groups)
+        ,   buff_best_count (cl_container, CL_MEM_READ_WRITE, cl_groups_per_iter)
         ,   match_u1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1p;}))
         ,   match_v1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1p;}))
         ,   match_u1c (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1c;}))
         ,   match_v1c (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1c;}))
-        ,   zeros (n_match_groups, 0)
+        ,   zeros (cl_groups_per_iter, 0)
     {
         update_deps.push_back( buff_match_u1p.write(match_u1p.data()) );
         update_deps.push_back( buff_match_v1p.write(match_v1p.data()) );
@@ -78,18 +80,20 @@ public:
         update_deps.push_back( buff_match_v1c.write(match_v1c.data()) );
         update_deps.push_back( buff_best_count.write(zeros.data()) );
 
-        kernel_get_inlier.setRanges(cl_n_matches, work_group_size)
+        kernel_get_inlier.setRanges(iters_per_batch*cl_n_matches, work_group_size)
                 .arg(buff_match_u1p)
                 .arg(buff_match_v1p)
                 .arg(buff_match_u1c)
                 .arg(buff_match_v1c)
                 .arg(cl_uint(n_matches))
+                .arg(cl_uint(cl_n_matches))
                 .arg(cl_float(inlier_threshold))
                 .arg(buff_fund_mat)
                 .arg(buff_inlier_mask)
                 ;
 
         kernel_sum.setRanges(n_counts*work_group_size, work_group_size)
+                .arg(cl_uint(0))
                 .arg(buff_inlier_mask)
                 .arg(buff_counts)
                 .arg(cl_uint(n_matches))
@@ -97,6 +101,7 @@ public:
                 ;
 
         kernel_update_inliers.setRanges(cl_n_matches, work_group_size)
+                .arg(cl_uint(0))
                 .arg(buff_inlier_mask)
                 .arg(buff_counts)
                 .arg(cl_uint(n_counts))
@@ -107,15 +112,32 @@ public:
                 ;
     }
 
-    void update(Matrix &F)
+    void update(const std::vector<Matrix> &F_estimates)
     {
-        cl::Event write_f_event = buff_fund_mat.write(&F.val[0][0], update_deps);
+        std::vector<double> F_array(9*iters_per_batch);
+        for (unsigned i=0; i<iters_per_batch; i++)
+        {
+            for (unsigned j=0; j<9; j++)
+            {
+                F_array[i*9+j] = F_estimates[i].val[0][j];
+            }
+        }
 
+        cl::Event write_f_event = buff_fund_mat.write(F_array.data(), update_deps);
         cl::Event get_inlier_complete_event = kernel_get_inlier.start({write_f_event});
-        cl::Event sum_complete_event = kernel_sum.start({get_inlier_complete_event});
-        cl::Event update_complete_event = kernel_update_inliers.start({sum_complete_event});
 
-        update_deps = {update_complete_event};
+        cl::Event kernel_sum_dep = get_inlier_complete_event;
+
+        for (unsigned i=0; i<iters_per_batch; i++)
+        {
+            cl::Event sum_complete_event = kernel_sum.arg(0, cl_uint(i*cl_n_matches)).start({kernel_sum_dep});
+            cl::Event update_complete_event = kernel_update_inliers.arg(0, cl_uint(i*cl_n_matches)).start({sum_complete_event});
+
+            kernel_sum_dep = update_complete_event;
+        }
+
+
+        update_deps = {kernel_sum_dep};
         write_f_event.wait();
 
 //        cl::WaitForEvents(update_deps);
@@ -147,22 +169,29 @@ public:
 
 Matrix VisualOdometryMono_CL::ransacEstimateF(const vector<Matcher::p_match> &p_matched)
 {
-    CLInlierFinder inlier_finder(p_matched, cl_container, param.inlier_threshold);
+    static const unsigned iters_per_batch = 4;
 
-    // initial RANSAC estimate of F
-    Matrix F;
-    for (int32_t k=0; k<param.ransac_iters; k++)
+    std::vector<Matrix> F_estimates(iters_per_batch);
+    CLInlierFinder inlier_finder(p_matched, cl_container, iters_per_batch, param.inlier_threshold);
+
+    for (int32_t k=0; k<param.ransac_iters; k+=iters_per_batch)
     {
-        // draw random sample set
-        vector<int32_t> active = getRandomSample(p_matched.size(),8);
+        // initial RANSAC estimates of F
+        for (auto &F : F_estimates)
+        {
+            // draw random sample set
+            vector<int32_t> active = getRandomSample(p_matched.size(), 8);
 
-        // estimate fundamental matrix and get inliers
-        fundamentalMatrix(p_matched,active,F);
-        inlier_finder.update(F);
+            // estimate fundamental matrix and get inliers
+            fundamentalMatrix(p_matched, active, F);
+        }
+
+        inlier_finder.update(F_estimates);
     }
 
     inliers = inlier_finder.getBestInliers();
 
+    Matrix F;
     // are there enough inliers?
     if (inliers.size()<10)
     {
