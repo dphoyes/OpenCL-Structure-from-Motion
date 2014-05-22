@@ -13,8 +13,9 @@ private:
 
     const unsigned n_matches;
     const size_t work_group_size = 128;
-    const size_t n_work_groups;
-    const size_t global_size;
+    const size_t n_match_groups;
+    const size_t cl_n_matches;
+    const unsigned n_counts = 2;
 
     OpenCL::Buffer<cl_float> buff_match_u1p;
     OpenCL::Buffer<cl_float> buff_match_v1p;
@@ -54,22 +55,22 @@ public:
         ,   kernel_sum (cl_container.getKernel("inlier.cl", "sum"))
         ,   kernel_update_inliers (cl_container.getKernel("inlier.cl", "update_best_inliers"))
         ,   n_matches (p_matched.size())
-        ,   n_work_groups ((n_matches + work_group_size - 1)/work_group_size)
-        ,   global_size (n_work_groups * work_group_size)
+        ,   n_match_groups ((n_matches + work_group_size - 1)/work_group_size)
+        ,   cl_n_matches (n_match_groups * work_group_size)
         ,   buff_match_u1p (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_match_v1p (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_match_u1c (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_match_v1c (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_fund_mat (cl_container, CL_MEM_READ_ONLY, 9)
         ,   buff_inlier_mask (cl_container, CL_MEM_READ_WRITE, n_matches)
-        ,   buff_counts (cl_container, CL_MEM_READ_WRITE, n_work_groups)
+        ,   buff_counts (cl_container, CL_MEM_READ_WRITE, n_counts)
         ,   buff_best_inlier_mask (cl_container, CL_MEM_READ_WRITE, n_matches)
-        ,   buff_best_count (cl_container, CL_MEM_READ_WRITE, n_work_groups)
+        ,   buff_best_count (cl_container, CL_MEM_READ_WRITE, n_match_groups)
         ,   match_u1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1p;}))
         ,   match_v1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1p;}))
         ,   match_u1c (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1c;}))
         ,   match_v1c (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1c;}))
-        ,   zeros (n_work_groups, 0)
+        ,   zeros (n_match_groups, 0)
     {
         update_deps.push_back( buff_match_u1p.write(match_u1p.data()) );
         update_deps.push_back( buff_match_v1p.write(match_v1p.data()) );
@@ -77,30 +78,33 @@ public:
         update_deps.push_back( buff_match_v1c.write(match_v1c.data()) );
         update_deps.push_back( buff_best_count.write(zeros.data()) );
 
-        kernel_get_inlier.arg(buff_match_u1p)
-                         .arg(buff_match_v1p)
-                         .arg(buff_match_u1c)
-                         .arg(buff_match_v1c)
-                         .arg(cl_uint(n_matches))
-                         .arg(cl_float(inlier_threshold))
-                         .arg(buff_fund_mat)
-                         .arg(buff_inlier_mask)
-                         .setRanges(global_size, work_group_size);
+        kernel_get_inlier.setRanges(cl_n_matches, work_group_size)
+                .arg(buff_match_u1p)
+                .arg(buff_match_v1p)
+                .arg(buff_match_u1c)
+                .arg(buff_match_v1c)
+                .arg(cl_uint(n_matches))
+                .arg(cl_float(inlier_threshold))
+                .arg(buff_fund_mat)
+                .arg(buff_inlier_mask)
+                ;
 
-        kernel_sum.arg(buff_inlier_mask)
-                  .arg(buff_counts)
-                  .arg(cl_uint(n_matches))
-                  .arg(cl::__local(work_group_size*sizeof(cl_ushort)))
-                  .setRanges(global_size, work_group_size);
+        kernel_sum.setRanges(n_counts*work_group_size, work_group_size)
+                .arg(buff_inlier_mask)
+                .arg(buff_counts)
+                .arg(cl_uint(n_matches))
+                .arg(cl::__local(work_group_size*sizeof(cl_ushort)))
+                ;
 
-        kernel_update_inliers.arg(buff_inlier_mask)
-                             .arg(buff_counts)
-                             .arg(cl_uint(n_work_groups))
-                             .arg(cl_uint(n_matches))
-                             .arg(buff_best_inlier_mask)
-                             .arg(buff_best_count)
-                             .arg(cl::__local(work_group_size*sizeof(cl_ushort)))
-                             .setRanges(global_size, work_group_size);
+        kernel_update_inliers.setRanges(cl_n_matches, work_group_size)
+                .arg(buff_inlier_mask)
+                .arg(buff_counts)
+                .arg(cl_uint(n_counts))
+                .arg(cl_uint(n_matches))
+                .arg(buff_best_inlier_mask)
+                .arg(buff_best_count)
+                .arg(cl::__local(work_group_size*sizeof(cl_ushort)))
+                ;
     }
 
     void update(Matrix &F)

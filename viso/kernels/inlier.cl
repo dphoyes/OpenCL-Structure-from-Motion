@@ -60,11 +60,17 @@ __kernel void sum(
         __local ushort *tmp
     )
 {
-    tmp[get_local_id(0)] = (get_global_id(0) < len) ? in[get_global_id(0)] : 0;
+    ushort sum = 0;
+    for (unsigned i=get_global_id(0); i<len; i+=get_global_size(0))
+    {
+        sum += in[i];
+    }
+
+    tmp[get_local_id(0)] = sum;
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    for (uint stride = get_local_size(0)/2; stride > 0; stride >>= 1)
+    for (uint stride = get_local_size(0)/2; stride > 0; stride /= 2)
     {
         if (get_local_id(0) < stride)
         {
