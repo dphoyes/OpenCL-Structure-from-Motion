@@ -86,25 +86,26 @@ __kernel void update_best_inliers(
         const uint n_counts,
         const uint p_matched_size,
         __global uchar *best_inliers,
-        __global ushort *best_count,
+        __global ushort *local_best_count,
         __local ushort *tmp
     )
 {
-    ushort count = 0;
-    for (unsigned i=0; i<n_counts; i++)
-    {
-        count += counts[i];
-    }
+    ushort best_count = local_best_count[get_group_id(0)];
 
-    if (count > best_count[get_global_id(0)] && get_global_id(0) < p_matched_size)
-    {
-        best_inliers[get_global_id(0)] = inliers[get_global_id(0)];
-    }
+    barrier(CLK_GLOBAL_MEM_FENCE);
 
-//    barrier(0);
-
-    if (count > best_count[get_global_id(0)])
+    if (get_global_id(0) < p_matched_size)
     {
-        best_count[get_global_id(0)] = count;
+        ushort count = 0;
+        for (unsigned i=0; i<n_counts; i++)
+        {
+            count += counts[i];
+        }
+
+        if (count > best_count)
+        {
+            best_inliers[get_global_id(0)] = inliers[get_global_id(0)];
+            if (get_local_id(0) == 0) local_best_count[get_group_id(0)] = count;
+        }
     }
 }

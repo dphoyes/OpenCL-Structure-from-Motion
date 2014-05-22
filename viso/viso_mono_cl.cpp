@@ -64,12 +64,12 @@ public:
         ,   buff_inlier_mask (cl_container, CL_MEM_READ_WRITE, n_matches)
         ,   buff_counts (cl_container, CL_MEM_READ_WRITE, n_work_groups)
         ,   buff_best_inlier_mask (cl_container, CL_MEM_READ_WRITE, n_matches)
-        ,   buff_best_count (cl_container, CL_MEM_READ_WRITE, global_size)
+        ,   buff_best_count (cl_container, CL_MEM_READ_WRITE, n_work_groups)
         ,   match_u1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1p;}))
         ,   match_v1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1p;}))
         ,   match_u1c (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1c;}))
         ,   match_v1c (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1c;}))
-        ,   zeros (global_size, 0)
+        ,   zeros (n_work_groups, 0)
     {
         update_deps.push_back( buff_match_u1p.write(match_u1p.data()) );
         update_deps.push_back( buff_match_v1p.write(match_v1p.data()) );
