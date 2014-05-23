@@ -100,7 +100,6 @@ public:
                 ;
 
         kernel_update_inliers.setRanges(cl_n_matches, work_group_size)
-                .arg(cl_uint(0))
                 .arg(buff_inlier_mask)
                 .arg(buff_counts)
                 .arg(cl_uint(iters_per_batch))
@@ -126,15 +125,7 @@ public:
         cl::Event write_f_event = buff_fund_mat.write(F_array.data(), update_deps);
         cl::Event get_inlier_complete_event = kernel_get_inlier.start({write_f_event});
         cl::Event sum_complete_event = kernel_sum.start({get_inlier_complete_event});
-
-        cl::Event update_complete_event;
-        for (unsigned i=0; i<iters_per_batch; i++)
-        {
-            update_complete_event = kernel_update_inliers.arg(0, cl_uint(i)).start({sum_complete_event});
-
-            sum_complete_event = update_complete_event;
-        }
-
+        cl::Event update_complete_event = kernel_update_inliers.start({sum_complete_event});
 
         update_deps = {update_complete_event};
         write_f_event.wait();

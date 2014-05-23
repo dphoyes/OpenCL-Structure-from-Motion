@@ -94,10 +94,9 @@ __kernel void sum(
 }
 
 __kernel void update_best_inliers(
-        const uint offset,
         __global const uchar *inliers,
         __global const ushort *counts,
-        const uint n_counts,
+        const uint iters_per_batch,
         const uint p_matched_size,
         const uint batch_width,
         __global uchar *best_inliers,
@@ -107,21 +106,28 @@ __kernel void update_best_inliers(
 {
     ushort best_count = local_best_count[get_group_id(0)];
 
+    int best_iter = -1;
+    for (unsigned i=0; i<iters_per_batch; i++)
+    {
+        const ushort iter_count = counts[i];
+        if (iter_count > best_count)
+        {
+            best_iter = i;
+            best_count = iter_count;
+        }
+    }
+
     barrier(CLK_GLOBAL_MEM_FENCE);
 
     if (get_global_id(0) < p_matched_size)
     {
-        // ushort count = 0;
-        // for (unsigned i=0; i<n_counts; i++)
-        // {
-        //     count += counts[i];
-        // }
-        ushort count = counts[offset];
 
-        if (count > best_count)
+        // ushort count = counts[offset];
+
+        if (best_iter != -1)
         {
-            best_inliers[get_global_id(0)] = inliers[offset*batch_width+get_global_id(0)];
-            if (get_local_id(0) == 0) local_best_count[get_group_id(0)] = count;
+            best_inliers[get_global_id(0)] = inliers[best_iter*batch_width+get_global_id(0)];
+            if (get_local_id(0) == 0) local_best_count[get_group_id(0)] = best_count;
         }
     }
 }
