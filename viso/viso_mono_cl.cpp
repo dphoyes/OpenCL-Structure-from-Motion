@@ -159,7 +159,7 @@ public:
 
 Matrix VisualOdometryMono_CL::ransacEstimateF(const vector<Matcher::p_match> &p_matched)
 {
-    static const unsigned iters_per_batch = 4;
+    static const unsigned iters_per_batch = 16;
 
     std::vector<Matrix> F_estimates(iters_per_batch);
     CLInlierFinder inlier_finder(p_matched, cl_container, iters_per_batch, param.inlier_threshold);

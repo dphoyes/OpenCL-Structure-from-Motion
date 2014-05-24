@@ -121,9 +121,6 @@ __kernel void update_best_inliers(
 
     if (get_global_id(0) < p_matched_size)
     {
-
-        // ushort count = counts[offset];
-
         if (best_iter != -1)
         {
             best_inliers[get_global_id(0)] = inliers[best_iter*batch_width+get_global_id(0)];
