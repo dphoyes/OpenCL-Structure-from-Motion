@@ -18,7 +18,7 @@ vector<int32_t> VisualOdometryMono_CL::getInlier (vector<Matcher::p_match> &p_ma
     cl::Event p_matched_write_event; cl_container->queue.enqueueWriteBuffer(buff_p_matched.buff, CL_FALSE, 0, buff_p_matched.size, p_matched.data(), NULL, &p_matched_write_event);
     cl::Event fund_mat_write_event; cl_container->queue.enqueueWriteBuffer(buff_fund_mat.buff, CL_FALSE, 0, buff_fund_mat.size, &F.val[0][0], NULL, &fund_mat_write_event);
 
-    cl::NDRange offset (0);
+    cl::NDRange offset;
     cl::NDRange globalSize (p_matched.size());
     cl::NDRange localSize (cl::NullRange);
 

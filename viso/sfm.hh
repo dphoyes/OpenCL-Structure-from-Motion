@@ -30,7 +30,11 @@ public:
 
         if (use_opencl)
         {
+#ifdef __arm__
+            cl_container.reset(new FPGAOpenCLContainer);
+#else
             cl_container.reset(new CPUOpenCLContainer);
+#endif
             cl_container->init(KERNEL_SRCS);
             viso.reset(new VisualOdometryMono_CL(params, cl_container));
         }

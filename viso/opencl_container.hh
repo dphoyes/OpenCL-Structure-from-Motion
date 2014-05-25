@@ -65,6 +65,19 @@ public:
         }
     }
 
+    void init(const std::unordered_map<std::string, std::vector<unsigned char> > &program_binaries)
+    {
+        getDevice();
+
+        context = cl::Context(devices);
+        queue = cl::CommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE);
+
+        for (auto &prog_bin: program_binaries)
+        {
+            makeProgram(prog_bin.first, prog_bin.second);
+        }
+    }
+
     void getDevice()
     {
         // Get list of platforms
@@ -129,6 +142,28 @@ public:
         }
     }
 
+    void makeProgram(const std::string &program_name, const std::vector<unsigned char> &program_bin)
+    {
+        cl::Program::Binaries binaries {std::make_pair(program_bin.data(), program_bin.size())};
+
+        auto res = programs.emplace(program_name, cl::Program(context, {device}, binaries));
+        auto &prog = res.first->second;
+
+        try
+        {
+            prog.build(devices);
+        }
+        catch(...)
+        {
+            for (auto d : devices)
+            {
+                std::cerr << "Log for device " << d.getInfo<CL_DEVICE_NAME>() << ":\n\n";
+                std::cerr << prog.getBuildInfo<CL_PROGRAM_BUILD_LOG>(d) << "\n\n";
+            }
+            throw;
+        }
+    }
+
     cl::Kernel getKernel(const std::string &file_name, const std::string &kernel_name)
     {
         return cl::Kernel(programs[file_name], kernel_name.c_str());
@@ -170,6 +205,17 @@ public:
                               ,  2048 // N_WORK_GROUPS
                               ,  256 // WORK_GROUP_SIZE
                           }
+    {}
+};
+
+class FPGAOpenCLContainer: public OpenCLContainer
+{
+public:
+    FPGAOpenCLContainer() : OpenCLContainer {
+                                  CL_DEVICE_TYPE_ACCELERATOR // DEVICE_TYPE
+                               ,  2048 // N_WORK_GROUPS
+                               ,  256 // WORK_GROUP_SIZE
+}
     {}
 };
 
