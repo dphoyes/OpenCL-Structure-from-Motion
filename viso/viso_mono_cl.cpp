@@ -16,7 +16,6 @@ private:
     const size_t work_group_size = 128;
     const size_t cl_groups_per_iter;
     const size_t cl_n_matches;
-    const unsigned n_counts = 2;
 
     OpenCL::Buffer<cl_float> buff_match_u1p;
     OpenCL::Buffer<cl_float> buff_match_v1p;
@@ -65,7 +64,7 @@ public:
         ,   buff_match_v1c (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_fund_mat (cl_container, CL_MEM_READ_ONLY, 9*iters_per_batch)
         ,   buff_inlier_mask (cl_container, CL_MEM_READ_WRITE, cl_n_matches*iters_per_batch)
-        ,   buff_counts (cl_container, CL_MEM_READ_WRITE, n_counts)
+        ,   buff_counts (cl_container, CL_MEM_READ_WRITE, iters_per_batch)
         ,   buff_best_inlier_mask (cl_container, CL_MEM_READ_WRITE, n_matches)
         ,   buff_best_count (cl_container, CL_MEM_READ_WRITE, cl_groups_per_iter)
         ,   match_u1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1p;}))
@@ -92,11 +91,11 @@ public:
                 .arg(buff_inlier_mask)
                 ;
 
-        kernel_sum.setRanges(n_counts*work_group_size, work_group_size)
-                .arg(cl_uint(0))
+        kernel_sum.setRanges(iters_per_batch*work_group_size, work_group_size)
                 .arg(buff_inlier_mask)
                 .arg(buff_counts)
                 .arg(cl_uint(n_matches))
+                .arg(cl_uint(cl_n_matches))
                 .arg(cl::__local(work_group_size*sizeof(cl_ushort)))
                 ;
 
@@ -104,8 +103,9 @@ public:
                 .arg(cl_uint(0))
                 .arg(buff_inlier_mask)
                 .arg(buff_counts)
-                .arg(cl_uint(n_counts))
+                .arg(cl_uint(iters_per_batch))
                 .arg(cl_uint(n_matches))
+                .arg(cl_uint(cl_n_matches))
                 .arg(buff_best_inlier_mask)
                 .arg(buff_best_count)
                 .arg(cl::__local(work_group_size*sizeof(cl_ushort)))
@@ -125,19 +125,18 @@ public:
 
         cl::Event write_f_event = buff_fund_mat.write(F_array.data(), update_deps);
         cl::Event get_inlier_complete_event = kernel_get_inlier.start({write_f_event});
+        cl::Event sum_complete_event = kernel_sum.start({get_inlier_complete_event});
 
-        cl::Event kernel_sum_dep = get_inlier_complete_event;
-
+        cl::Event update_complete_event;
         for (unsigned i=0; i<iters_per_batch; i++)
         {
-            cl::Event sum_complete_event = kernel_sum.arg(0, cl_uint(i*cl_n_matches)).start({kernel_sum_dep});
-            cl::Event update_complete_event = kernel_update_inliers.arg(0, cl_uint(i*cl_n_matches)).start({sum_complete_event});
+            update_complete_event = kernel_update_inliers.arg(0, cl_uint(i)).start({sum_complete_event});
 
-            kernel_sum_dep = update_complete_event;
+            sum_complete_event = update_complete_event;
         }
 
 
-        update_deps = {kernel_sum_dep};
+        update_deps = {update_complete_event};
         write_f_event.wait();
 
 //        cl::WaitForEvents(update_deps);

@@ -57,17 +57,20 @@ __kernel void find_inliers(
 }
 
 __kernel void sum(
-        const uint offset,
         __global const uchar *in,
         __global ushort *out,
-        const uint len,
+        const uint iter_len,
+        const uint batch_width,
         __local ushort *tmp
     )
 {
+    const size_t iter_id = get_group_id(0);
+    const unsigned base_offset = iter_id*batch_width;
+
     ushort sum = 0;
-    for (unsigned i=get_global_id(0); i<len; i+=get_global_size(0))
+    for (unsigned i=get_local_id(0); i<iter_len; i+=get_local_size(0))
     {
-        sum += in[offset+i];
+        sum += in[base_offset+i];
     }
 
     tmp[get_local_id(0)] = sum;
@@ -96,6 +99,7 @@ __kernel void update_best_inliers(
         __global const ushort *counts,
         const uint n_counts,
         const uint p_matched_size,
+        const uint batch_width,
         __global uchar *best_inliers,
         __global ushort *local_best_count,
         __local ushort *tmp
@@ -107,15 +111,16 @@ __kernel void update_best_inliers(
 
     if (get_global_id(0) < p_matched_size)
     {
-        ushort count = 0;
-        for (unsigned i=0; i<n_counts; i++)
-        {
-            count += counts[i];
-        }
+        // ushort count = 0;
+        // for (unsigned i=0; i<n_counts; i++)
+        // {
+        //     count += counts[i];
+        // }
+        ushort count = counts[offset];
 
         if (count > best_count)
         {
-            best_inliers[get_global_id(0)] = inliers[offset+get_global_id(0)];
+            best_inliers[get_global_id(0)] = inliers[offset*batch_width+get_global_id(0)];
             if (get_local_id(0) == 0) local_best_count[get_group_id(0)] = count;
         }
     }
