@@ -107,6 +107,7 @@ public:
         cl::Event update_complete_event = kernel_update_inliers.start({sum_complete_event});
 
         update_deps = {update_complete_event};
+        write_f_event.wait();
 
 //        cl::WaitForEvents(update_deps);
 //        std::cerr << "write f: " << cl_container.durationOfEvent(write_f_event) << "  ";
