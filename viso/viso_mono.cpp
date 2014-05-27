@@ -20,6 +20,7 @@ Street, Fifth Floor, Boston, MA 02110-1301, USA
 */
 
 #include "viso_mono.h"
+#include "timer.hh"
 
 using namespace std;
 
@@ -54,6 +55,8 @@ vector<double> VisualOdometryMono::estimateMotion (vector<Matcher::p_match> p_ma
   if (!normalizeFeaturePoints(p_matched_normalized,Tp,Tc))
     return vector<double>();
 
+  StartTimer estimate_f_timer("Estimate F time");
+
   // initial RANSAC estimate of F
   Matrix E,F;
   inliers.clear();
@@ -70,13 +73,15 @@ vector<double> VisualOdometryMono::estimateMotion (vector<Matcher::p_match> p_ma
     if (inliers_curr.size()>inliers.size())
       inliers = inliers_curr;
   }
-  
+
   // are there enough inliers?
   if (inliers.size()<10)
     return vector<double>();
   
   // refine F using all inliers
   fundamentalMatrix(p_matched_normalized,inliers,F); 
+
+  estimate_f_timer.end();
   
   // denormalise and extract essential matrix
   F = ~Tc*F*Tp;
@@ -115,6 +120,8 @@ vector<double> VisualOdometryMono::estimateMotion (vector<Matcher::p_match> p_ma
   // project features to 2d
   Matrix x_plane(2,X_plane.n);
   x_plane.setMat(X_plane.getMat(1,0,2,-1),0,0);
+
+  StartTimer best_plane_timer("Best plane time");
   
   Matrix n(2,1);
   n.val[0][0]       = cos(-param.pitch);
@@ -140,6 +147,8 @@ vector<double> VisualOdometryMono::estimateMotion (vector<Matcher::p_match> p_ma
     }
   }
   t = t*param.height/d.val[0][best_idx];
+
+  best_plane_timer.end();
   
   // compute rotation angles
   double ry = asin(R.val[0][2]);

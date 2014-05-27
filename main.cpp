@@ -4,7 +4,6 @@
 #include <array>
 #include <memory>
 #include <iomanip>
-#include <chrono>
 #include <stdint.h>
 #include <unistd.h>
 #include <stdexcept>
@@ -13,6 +12,7 @@
 #include "gui.hh"
 #include "sfm.hh"
 #include "image_sequence.hh"
+#include "timer.hh"
 
 using namespace std;
 
@@ -102,23 +102,19 @@ int main (int argc, char** argv)
     if (param.use_gui) gui.reset(new PointCloudViewer);
     else gui.reset(new NoPointCloudViewer);
 
-    auto t0 = chrono::high_resolution_clock::now();
+    StartTimer timer("Total time");
 
     for (unsigned i=0; i<param.n_frames; i++)
     {
         uint8_t* img_data = video.getFrame(i);
-        cout << "Processing: Frame: " << i;
+        cout << "Processing: Frame: " << i << "\n";
         sfm.update(img_data);
         gui->update(sfm.getPoints());
     }
 
-    auto t1 = chrono::high_resolution_clock::now();
+    timer.end();
 
-    auto execution_time = chrono::duration_cast<chrono::microseconds>(t1 - t0);
-    double time_seconds = (execution_time.count()*1e-6);
-    double fps = param.n_frames / time_seconds;
-    cout << "Total time: " << time_seconds << " s" << endl;
-    cout << "FPS: " << fps << endl;
+    cout << "FPS: " << param.n_frames / timer.seconds() << endl;
 
     if (!param.out_file.empty())
     {

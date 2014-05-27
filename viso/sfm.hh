@@ -57,7 +57,7 @@ public:
             // print stats
             double num_matches = viso->getNumberOfMatches();
             double num_inliers = viso->getNumberOfInliers();
-            std::cout << ", Matches: " << num_matches;
+            std::cout << "Matches: " << num_matches;
             std::cout << ", Inliers: " << 100.0*num_inliers/num_matches << '%' << ", Current pose: " << std::endl;
             std::cout << Tr_total << std::endl << std::endl;
 
