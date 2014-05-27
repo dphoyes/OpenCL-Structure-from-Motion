@@ -29,6 +29,13 @@ private:
 
     std::vector<cl::Event> update_deps;
 
+    typedef Matcher::p_match match_t;
+    const std::vector<cl_float> match_u1p;
+    const std::vector<cl_float> match_v1p;
+    const std::vector<cl_float> match_u1c;
+    const std::vector<cl_float> match_v1c;
+    const std::vector<cl_ushort> zeros;
+
     template <typename oT, typename iT>
     std::vector<oT> map(const std::vector<iT> &i_vec, std::function<oT(iT)> func)
     {
@@ -58,14 +65,12 @@ public:
         ,   buff_counts (cl_container, CL_MEM_READ_WRITE, n_work_groups)
         ,   buff_best_inlier_mask (cl_container, CL_MEM_READ_WRITE, n_matches)
         ,   buff_best_count (cl_container, CL_MEM_READ_WRITE, n_work_groups)
+        ,   match_u1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1p;}))
+        ,   match_v1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1p;}))
+        ,   match_u1c (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1c;}))
+        ,   match_v1c (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1c;}))
+        ,   zeros (n_work_groups, 0)
     {
-        typedef Matcher::p_match match_t;
-        const std::vector<cl_float> match_u1p = map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1p;});
-        const std::vector<cl_float> match_v1p = map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1p;});
-        const std::vector<cl_float> match_u1c = map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1c;});
-        const std::vector<cl_float> match_v1c = map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1c;});
-        const std::vector<cl_ushort> zeros(n_work_groups, 0);
-
         update_deps.push_back( buff_match_u1p.write(match_u1p.data()) );
         update_deps.push_back( buff_match_v1p.write(match_v1p.data()) );
         update_deps.push_back( buff_match_u1c.write(match_u1c.data()) );
