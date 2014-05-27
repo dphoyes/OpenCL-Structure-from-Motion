@@ -22,7 +22,7 @@ private:
     OpenCL::Buffer<cl_float> buff_match_u1c;
     OpenCL::Buffer<cl_float> buff_match_v1c;
 
-    OpenCL::Buffer<cl_double> buff_fund_mat;
+    OpenCL::Buffer<cl_float> buff_fund_mat;
     OpenCL::Buffer<cl_uchar> buff_inlier_mask;
     OpenCL::Buffer<cl_ushort> buff_counts;
     OpenCL::Buffer<cl_uchar> buff_best_inlier_mask;
@@ -80,7 +80,7 @@ public:
         update_deps.push_back( buff_match_v1c.write(match_v1c.data()) );
         update_deps.push_back( buff_best_count.write(zeros.data()) );
 
-        kernel_get_inlier.setRange(cl::NDRange(iters_per_batch*cl_n_matches))
+        kernel_get_inlier.setRange(cl::NDRange(cl_n_matches*iters_per_batch))
                 .arg(buff_match_u1p)
                 .arg(buff_match_v1p)
                 .arg(buff_match_u1c)
@@ -92,12 +92,11 @@ public:
                 .arg(buff_inlier_mask)
                 ;
 
-        kernel_sum.setRange(cl::NDRange(iters_per_batch*work_group_size))
+        kernel_sum.setRange(cl::NDRange(work_group_size*iters_per_batch))
                 .arg(buff_inlier_mask)
                 .arg(buff_counts)
                 .arg(cl_uint(n_matches))
                 .arg(cl_uint(cl_n_matches))
-                .arg(cl::__local(work_group_size*sizeof(cl_ushort)))
                 ;
 
         kernel_update_inliers.setRange(cl::NDRange(cl_n_matches))
@@ -108,13 +107,12 @@ public:
                 .arg(cl_uint(cl_n_matches))
                 .arg(buff_best_inlier_mask)
                 .arg(buff_best_count)
-//                .arg(cl::__local(work_group_size*sizeof(cl_ushort)))
                 ;
     }
 
     void update(const std::vector<Matrix> &F_estimates)
     {
-        std::vector<double> F_array(9*iters_per_batch);
+        std::vector<float> F_array(9*iters_per_batch);
         for (unsigned i=0; i<iters_per_batch; i++)
         {
             for (unsigned j=0; j<9; j++)

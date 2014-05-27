@@ -1,6 +1,6 @@
-#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+#define WORK_GROUP_SIZE 128
 
-__kernel __attribute__((reqd_work_group_size(128, 1, 1)))
+__kernel __attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
 void find_inliers(
         __global const float * restrict match_u1p,
         __global const float * restrict match_v1p,
@@ -9,7 +9,7 @@ void find_inliers(
         const uint p_matched_size,
         const uint work_items_per_F,
         const float thresh,
-        __global const double * restrict fund_mat,
+        __global const float * restrict fund_mat,
         __global uchar * restrict inlier_mask
     )
 {
@@ -57,15 +57,16 @@ void find_inliers(
     }
 }
 
-__kernel __attribute__((reqd_work_group_size(128, 1, 1)))
+__kernel __attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
 void sum(
         __global const uchar * restrict in,
         __global ushort * restrict out,
         const uint iter_len,
-        const uint batch_width,
-        __local ushort * restrict tmp
+        const uint batch_width
     )
 {
+    __local ushort tmp[WORK_GROUP_SIZE];
+
     const size_t iter_id = get_group_id(0);
     const unsigned base_offset = iter_id*batch_width;
 
@@ -95,7 +96,7 @@ void sum(
     }
 }
 
-__kernel __attribute__((reqd_work_group_size(128, 1, 1)))
+__kernel __attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
 void update_best_inliers(
         __global const uchar * restrict inliers,
         __global const ushort * restrict counts,

@@ -25,6 +25,9 @@ cl::Event Kernel::start(const std::vector<cl::Event> &deps)
 Kernel& Kernel::setRange(const cl::NDRange &global)
 {
     this->global_size = global;
+    if (global.dimensions() == 1) this->local_size = cl::NDRange(reqd_local_size[0]);
+    if (global.dimensions() == 2) this->local_size = cl::NDRange(reqd_local_size[0], reqd_local_size[1]);
+    if (global.dimensions() == 3) this->local_size = cl::NDRange(reqd_local_size[0], reqd_local_size[1], reqd_local_size[2]);
     return *this;
 }
 
