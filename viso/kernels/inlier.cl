@@ -7,24 +7,21 @@ void find_inliers(
         __global const float * restrict match_u1c,
         __global const float * restrict match_v1c,
         const uint p_matched_size,
-        const uint work_items_per_F,
         const float thresh,
-        __global const float * restrict fund_mat,
+        __global const float * restrict fund_mats,
         __global uchar * restrict inlier_mask
     )
 {
     __local float f[9];
-    const size_t sub_iter_id = get_global_id(0)%(work_items_per_F);
 
     if (get_local_id(0) < 9)
     {
-        const size_t iter_id = get_global_id(0)/work_items_per_F;
-        f[get_local_id(0)] = fund_mat[iter_id*9 + get_local_id(0)];
+        f[get_local_id(0)] = fund_mats[get_global_id(1)*9 + get_local_id(0)];
     }
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    if (sub_iter_id < p_matched_size)
+    if (get_global_id(0) < p_matched_size)
     {
         // extract fundamental matrix
         float f00 = f[0]; float f01 = f[1]; float f02 = f[2];
@@ -32,10 +29,10 @@ void find_inliers(
         float f20 = f[6]; float f21 = f[7]; float f22 = f[8];
 
         // extract matches
-        float u1 = match_u1p[sub_iter_id];
-        float v1 = match_v1p[sub_iter_id];
-        float u2 = match_u1c[sub_iter_id];
-        float v2 = match_v1c[sub_iter_id];
+        float u1 = match_u1p[get_global_id(0)];
+        float v1 = match_v1p[get_global_id(0)];
+        float u2 = match_u1c[get_global_id(0)];
+        float v2 = match_v1c[get_global_id(0)];
 
         // F*x1
         float Fx1u = f00*u1+f01*v1+f02;
@@ -53,7 +50,7 @@ void find_inliers(
         float d = x2tFx1*x2tFx1 / (Fx1u*Fx1u+Fx1v*Fx1v+Ftx2u*Ftx2u+Ftx2v*Ftx2v);
 
         // check threshold
-        inlier_mask[get_global_id(0)] = fabs(d) < thresh;
+        inlier_mask[get_global_id(1)*get_global_size(0) + get_global_id(0)] = fabs(d) < thresh;
     }
 }
 

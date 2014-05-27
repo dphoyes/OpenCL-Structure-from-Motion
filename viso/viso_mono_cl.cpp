@@ -80,13 +80,12 @@ public:
         update_deps.push_back( buff_match_v1c.write(match_v1c.data()) );
         update_deps.push_back( buff_best_count.write(zeros.data()) );
 
-        kernel_get_inlier.setRange(cl::NDRange(cl_n_matches*iters_per_batch))
+        kernel_get_inlier.setRange(cl::NDRange(cl_n_matches, iters_per_batch))
                 .arg(buff_match_u1p)
                 .arg(buff_match_v1p)
                 .arg(buff_match_u1c)
                 .arg(buff_match_v1c)
                 .arg(cl_uint(n_matches))
-                .arg(cl_uint(cl_n_matches))
                 .arg(cl_float(inlier_threshold))
                 .arg(buff_fund_mat)
                 .arg(buff_inlier_mask)
