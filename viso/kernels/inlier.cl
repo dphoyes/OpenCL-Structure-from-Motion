@@ -6,6 +6,7 @@ void find_inliers(
         __global const float * restrict match_v1p,
         __global const float * restrict match_u1c,
         __global const float * restrict match_v1c,
+        const uint p_matched_size,
         const float thresh,
         __global const float * restrict fund_mats,
         __global uchar * restrict inlier_mask
@@ -20,34 +21,37 @@ void find_inliers(
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    // extract fundamental matrix
-    float f00 = f[0]; float f01 = f[1]; float f02 = f[2];
-    float f10 = f[3]; float f11 = f[4]; float f12 = f[5];
-    float f20 = f[6]; float f21 = f[7]; float f22 = f[8];
+    if (get_global_id(0) < p_matched_size)
+    {
+        // extract fundamental matrix
+        float f00 = f[0]; float f01 = f[1]; float f02 = f[2];
+        float f10 = f[3]; float f11 = f[4]; float f12 = f[5];
+        float f20 = f[6]; float f21 = f[7]; float f22 = f[8];
 
-    // extract matches
-    float u1 = match_u1p[get_global_id(0)];
-    float v1 = match_v1p[get_global_id(0)];
-    float u2 = match_u1c[get_global_id(0)];
-    float v2 = match_v1c[get_global_id(0)];
+        // extract matches
+        float u1 = match_u1p[get_global_id(0)];
+        float v1 = match_v1p[get_global_id(0)];
+        float u2 = match_u1c[get_global_id(0)];
+        float v2 = match_v1c[get_global_id(0)];
 
-    // F*x1
-    float Fx1u = f00*u1+f01*v1+f02;
-    float Fx1v = f10*u1+f11*v1+f12;
-    float Fx1w = f20*u1+f21*v1+f22;
+        // F*x1
+        float Fx1u = f00*u1+f01*v1+f02;
+        float Fx1v = f10*u1+f11*v1+f12;
+        float Fx1w = f20*u1+f21*v1+f22;
 
-    // F'*x2
-    float Ftx2u = f00*u2+f10*v2+f20;
-    float Ftx2v = f01*u2+f11*v2+f21;
+        // F'*x2
+        float Ftx2u = f00*u2+f10*v2+f20;
+        float Ftx2v = f01*u2+f11*v2+f21;
 
-    // x2'*F*x1
-    float x2tFx1 = u2*Fx1u+v2*Fx1v+Fx1w;
+        // x2'*F*x1
+        float x2tFx1 = u2*Fx1u+v2*Fx1v+Fx1w;
 
-    // sampson distance
-    float d = x2tFx1*x2tFx1 / (Fx1u*Fx1u+Fx1v*Fx1v+Ftx2u*Ftx2u+Ftx2v*Ftx2v);
+        // sampson distance
+        float d = x2tFx1*x2tFx1 / (Fx1u*Fx1u+Fx1v*Fx1v+Ftx2u*Ftx2u+Ftx2v*Ftx2v);
 
-    // check threshold
-    inlier_mask[get_global_id(1)*get_global_size(0) + get_global_id(0)] = fabs(d) < thresh;
+        // check threshold
+        inlier_mask[get_global_id(1)*get_global_size(0) + get_global_id(0)] = fabs(d) < thresh;
+    }
 }
 
 __kernel __attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))

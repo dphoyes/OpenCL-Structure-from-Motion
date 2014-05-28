@@ -85,6 +85,7 @@ public:
                 .arg(buff_match_v1p)
                 .arg(buff_match_u1c)
                 .arg(buff_match_v1c)
+                .arg(cl_uint((n_matches + 1) & ~1))
                 .arg(cl_float(inlier_threshold))
                 .arg(buff_fund_mat)
                 .arg(buff_inlier_mask)
