@@ -22,6 +22,13 @@ cl::Event Kernel::start(const std::vector<cl::Event> &deps)
     return ev;
 }
 
+cl::Event Kernel::startTask(const std::vector<cl::Event> &deps)
+{
+    cl::Event ev;
+    cl_container.queue.enqueueTask(kernel, &deps, &ev);
+    return ev;
+}
+
 Kernel& Kernel::setRange(const cl::NDRange &global)
 {
     this->global_size = global;

@@ -110,6 +110,7 @@ public:
     Kernel(Container &cl_container, const cl::Program& program, const char* name);
 
     cl::Event start(const std::vector<cl::Event> &deps = {});
+    cl::Event startTask(const std::vector<cl::Event> &deps = {});
 
     template<typename T>
     __attribute__((always_inline)) Kernel& arg(T val)
