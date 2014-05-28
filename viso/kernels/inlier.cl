@@ -16,7 +16,8 @@ __kernel void find_inliers(
         __global const float * restrict match_v1c,
         const float thresh,
         __global const struct mat_t * restrict fund_mats,
-        __global uchar * restrict inlier_mask
+        __global uchar * restrict inlier_mask,
+        __global ushort * restrict counts
     )
 {
     for (uint iter=0; iter<iters_per_batch; iter++)
@@ -26,7 +27,9 @@ __kernel void find_inliers(
         // extract fundamental matrix
         const struct mat_t f = fund_mats[iter];
 
-        for (unsigned match_id=0; match_id<n_matches; match_id++)
+        ushort n_inliers = 0;
+
+        for (uint match_id=0; match_id<n_matches; match_id++)
         {
             // extract matches
             float u1 = match_u1p[ match_id ];
@@ -50,47 +53,12 @@ __kernel void find_inliers(
             float d = x2tFx1*x2tFx1 / (Fx1u*Fx1u+Fx1v*Fx1v+Ftx2u*Ftx2u+Ftx2v*Ftx2v);
 
             // check threshold
-            inlier_mask[inlier_offset + match_id] = fabs(d) < thresh;
-        }
-    }
-}
-
-__kernel __attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
-void sum(
-        __global const uchar * restrict in,
-        __global ushort * restrict out,
-        const uint iter_len,
-        const uint batch_width
-    )
-{
-    __local ushort tmp[WORK_GROUP_SIZE];
-
-    const size_t iter_id = get_group_id(0);
-    const unsigned base_offset = iter_id*batch_width;
-
-    ushort sum = 0;
-    for (unsigned i=get_local_id(0); i<iter_len; i+=get_local_size(0))
-    {
-        sum += in[base_offset+i];
-    }
-
-    tmp[get_local_id(0)] = sum;
-
-    barrier(CLK_LOCAL_MEM_FENCE);
-
-    for (uint stride = get_local_size(0)/2; stride > 0; stride /= 2)
-    {
-        if (get_local_id(0) < stride)
-        {
-            tmp[get_local_id(0)] += tmp[get_local_id(0) + stride];
+            bool is_inlier = fabs(d) < thresh;
+            inlier_mask[inlier_offset + match_id] = is_inlier;
+            if (is_inlier) n_inliers++;
         }
 
-        barrier(CLK_LOCAL_MEM_FENCE);
-    }
-
-    if (get_local_id(0) == 0)
-    {
-        out[get_group_id(0)] = tmp[0];
+        counts[iter] = n_inliers;
     }
 }
 

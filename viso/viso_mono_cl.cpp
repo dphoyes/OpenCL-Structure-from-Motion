@@ -8,7 +8,6 @@ private:
     OpenCL::Container &cl_container;
 
     OpenCL::Kernel kernel_get_inlier;
-    OpenCL::Kernel kernel_sum;
     OpenCL::Kernel kernel_update_inliers;
 
     const unsigned n_matches;
@@ -52,7 +51,6 @@ public:
     CLInlierFinder(const vector<Matcher::p_match> &p_matched, OpenCL::Container &cl_container, unsigned iters_per_batch, float inlier_threshold)
         :   cl_container (cl_container)
         ,   kernel_get_inlier (cl_container.getKernel("inlier.cl", "find_inliers"))
-        ,   kernel_sum (cl_container.getKernel("inlier.cl", "sum"))
         ,   kernel_update_inliers (cl_container.getKernel("inlier.cl", "update_best_inliers"))
         ,   n_matches (p_matched.size())
         ,   iters_per_batch (iters_per_batch)
@@ -91,13 +89,7 @@ public:
                 .arg(cl_float(inlier_threshold))
                 .arg(buff_fund_mat)
                 .arg(buff_inlier_mask)
-                ;
-
-        kernel_sum.setRange(cl::NDRange(work_group_size*iters_per_batch))
-                .arg(buff_inlier_mask)
                 .arg(buff_counts)
-                .arg(cl_uint(n_matches))
-                .arg(cl_uint(cl_n_matches))
                 ;
 
         kernel_update_inliers.setRange(cl::NDRange(cl_n_matches))
@@ -124,8 +116,7 @@ public:
 
         cl::Event write_f_event = buff_fund_mat.write(F_array.data(), update_deps);
         cl::Event get_inlier_complete_event = kernel_get_inlier.startTask({write_f_event});
-        cl::Event sum_complete_event = kernel_sum.start({get_inlier_complete_event});
-        cl::Event update_complete_event = kernel_update_inliers.start({sum_complete_event});
+        cl::Event update_complete_event = kernel_update_inliers.start({get_inlier_complete_event});
 
         update_deps = {update_complete_event};
         write_f_event.wait();
