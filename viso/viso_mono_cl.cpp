@@ -18,7 +18,6 @@ private:
     OpenCL::Buffer<cl_float> buff_match_v1c;
 
     OpenCL::Buffer<cl_float> buff_fund_mat;
-    OpenCL::Buffer<cl_uchar> buff_inlier_mask;
     OpenCL::Buffer<cl_uchar> buff_best_inlier_mask;
     OpenCL::Buffer<cl_ushort> buff_best_count;
 
@@ -53,8 +52,7 @@ public:
         ,   buff_match_u1c (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_match_v1c (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_fund_mat (cl_container, CL_MEM_READ_ONLY, 9*iters_per_batch)
-        ,   buff_inlier_mask (cl_container, CL_MEM_READ_WRITE, n_matches*iters_per_batch)
-        ,   buff_best_inlier_mask (cl_container, CL_MEM_READ_WRITE, n_matches)
+        ,   buff_best_inlier_mask (cl_container, CL_MEM_WRITE_ONLY, n_matches)
         ,   buff_best_count (cl_container, CL_MEM_READ_WRITE, 1)
         ,   match_u1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1p;}))
         ,   match_v1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1p;}))
@@ -77,7 +75,6 @@ public:
                 .arg(buff_match_v1c)
                 .arg(cl_float(inlier_threshold))
                 .arg(buff_fund_mat)
-                .arg(buff_inlier_mask)
                 .arg(buff_best_inlier_mask)
                 .arg(buff_best_count)
                 ;
