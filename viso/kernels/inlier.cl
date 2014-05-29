@@ -22,16 +22,16 @@ __kernel void find_inliers(
         __global ushort * restrict prev_best_count
     )
 {
-    bool best_inlier_mask[MAX_N_MATCHES];
+    bool inlier_masks[2][MAX_N_MATCHES];
     ushort best_count = *prev_best_count;
     bool found_better_inliers = false;
+    bool inlier_scratch = false;
 
     for (uint iter=0; iter<iters_per_batch; iter++)
     {
         // extract fundamental matrix
         const struct mat_t f = fund_mats[iter];
 
-        bool inlier_mask[MAX_N_MATCHES];
         ushort n_inliers = 0;
 
         for (uint match_id=0; match_id<n_matches; match_id++)
@@ -61,18 +61,14 @@ __kernel void find_inliers(
             const bool is_inlier = fabs(d) < thresh;
 
             if (is_inlier) n_inliers++;
-            inlier_mask[match_id] = is_inlier;
+            inlier_masks[inlier_scratch][match_id] = is_inlier;
         }
 
         if (n_inliers > best_count)
         {
             found_better_inliers = true;
             best_count = n_inliers;
-
-            for (uint i=0; i<MAX_N_MATCHES; i++)
-            {
-                best_inlier_mask[i] = inlier_mask[i];
-            }
+            inlier_scratch = !inlier_scratch;
         }
     }
 
@@ -81,7 +77,7 @@ __kernel void find_inliers(
         *prev_best_count = best_count;
         for (uint i=0; i<n_matches; i++)
         {
-            return_best_inliers[i] = best_inlier_mask[i];
+            return_best_inliers[i] = inlier_masks[!inlier_scratch][i];
         }
     }
 }
