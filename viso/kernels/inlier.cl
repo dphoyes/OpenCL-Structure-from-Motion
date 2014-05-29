@@ -17,12 +17,14 @@ __kernel void find_inliers(
         __global const float * restrict match_v1c,
         const float thresh,
         __global const struct mat_t * restrict fund_mats,
-        __global uchar * restrict inlier_mask,
-        __global ushort * restrict counts,
+        __global uchar * restrict inlier_masks,
         __global uchar * restrict best_inliers,
         __global ushort * restrict prev_best_count
     )
 {
+    ushort best_count = *prev_best_count;
+    int best_iter = -1;
+
     for (uint iter=0; iter<iters_per_batch; iter++)
     {
         // extract fundamental matrix
@@ -55,23 +57,14 @@ __kernel void find_inliers(
 
             // check threshold
             bool is_inlier = fabs(d) < thresh;
-            inlier_mask[iter*n_matches + match_id] = is_inlier;
+            inlier_masks[iter*n_matches + match_id] = is_inlier;
             if (is_inlier) n_inliers++;
         }
 
-        counts[iter] = n_inliers;
-    }
-
-    ushort best_count = *prev_best_count;
-    int best_iter = -1;
-
-    for (uint i=0; i<iters_per_batch; i++)
-    {
-        const ushort iter_count = counts[i];
-        if (iter_count > best_count)
+        if (n_inliers > best_count)
         {
-            best_iter = i;
-            best_count = iter_count;
+            best_iter = iter;
+            best_count = n_inliers;
         }
     }
 
@@ -80,7 +73,7 @@ __kernel void find_inliers(
         *prev_best_count = best_count;
         for (uint i=0; i<n_matches; i++)
         {
-            best_inliers[i] = inlier_mask[best_iter*n_matches+i];
+            best_inliers[i] = inlier_masks[best_iter*n_matches+i];
         }
     }
 }
