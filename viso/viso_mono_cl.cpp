@@ -8,13 +8,9 @@ private:
     OpenCL::Container &cl_container;
 
     OpenCL::Kernel kernel_get_inlier;
-    OpenCL::Kernel kernel_update_inliers;
 
     const unsigned n_matches;
     const unsigned iters_per_batch;
-    const size_t work_group_size;
-    const size_t cl_groups_per_iter;
-    const size_t cl_n_matches;
 
     OpenCL::Buffer<cl_float> buff_match_u1p;
     OpenCL::Buffer<cl_float> buff_match_v1p;
@@ -51,26 +47,22 @@ public:
     CLInlierFinder(const vector<Matcher::p_match> &p_matched, OpenCL::Container &cl_container, unsigned iters_per_batch, float inlier_threshold)
         :   cl_container (cl_container)
         ,   kernel_get_inlier (cl_container.getKernel("inlier.cl", "find_inliers"))
-        ,   kernel_update_inliers (cl_container.getKernel("inlier.cl", "update_best_inliers"))
         ,   n_matches (p_matched.size())
         ,   iters_per_batch (iters_per_batch)
-        ,   work_group_size (kernel_update_inliers.local_size[0])
-        ,   cl_groups_per_iter ((n_matches + work_group_size - 1)/work_group_size)
-        ,   cl_n_matches (cl_groups_per_iter * work_group_size)
         ,   buff_match_u1p (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_match_v1p (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_match_u1c (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_match_v1c (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_fund_mat (cl_container, CL_MEM_READ_ONLY, 9*iters_per_batch)
-        ,   buff_inlier_mask (cl_container, CL_MEM_READ_WRITE, cl_n_matches*iters_per_batch)
+        ,   buff_inlier_mask (cl_container, CL_MEM_READ_WRITE, n_matches*iters_per_batch)
         ,   buff_counts (cl_container, CL_MEM_READ_WRITE, iters_per_batch)
         ,   buff_best_inlier_mask (cl_container, CL_MEM_READ_WRITE, n_matches)
-        ,   buff_best_count (cl_container, CL_MEM_READ_WRITE, cl_groups_per_iter)
+        ,   buff_best_count (cl_container, CL_MEM_READ_WRITE, 1)
         ,   match_u1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1p;}))
         ,   match_v1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1p;}))
         ,   match_u1c (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1c;}))
         ,   match_v1c (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1c;}))
-        ,   zeros (cl_groups_per_iter, 0)
+        ,   zeros (1, 0)
     {
         update_deps.push_back( buff_match_u1p.write(match_u1p.data()) );
         update_deps.push_back( buff_match_v1p.write(match_v1p.data()) );
@@ -80,7 +72,6 @@ public:
 
         kernel_get_inlier //.setRange(cl::NDRange(cl_n_matches, iters_per_batch))
                 .arg(cl_uint(n_matches))
-                .arg(cl_uint(cl_n_matches))
                 .arg(cl_uint(iters_per_batch))
                 .arg(buff_match_u1p)
                 .arg(buff_match_v1p)
@@ -90,14 +81,6 @@ public:
                 .arg(buff_fund_mat)
                 .arg(buff_inlier_mask)
                 .arg(buff_counts)
-                ;
-
-        kernel_update_inliers.setRange(cl::NDRange(cl_n_matches))
-                .arg(buff_inlier_mask)
-                .arg(buff_counts)
-                .arg(cl_uint(iters_per_batch))
-                .arg(cl_uint(n_matches))
-                .arg(cl_uint(cl_n_matches))
                 .arg(buff_best_inlier_mask)
                 .arg(buff_best_count)
                 ;
@@ -116,9 +99,8 @@ public:
 
         cl::Event write_f_event = buff_fund_mat.write(F_array.data(), update_deps);
         cl::Event get_inlier_complete_event = kernel_get_inlier.startTask({write_f_event});
-        cl::Event update_complete_event = kernel_update_inliers.start({get_inlier_complete_event});
 
-        update_deps = {update_complete_event};
+        update_deps = {get_inlier_complete_event};
         write_f_event.wait();
 
 //        cl::WaitForEvents(update_deps);

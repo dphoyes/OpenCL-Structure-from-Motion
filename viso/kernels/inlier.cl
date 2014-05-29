@@ -5,10 +5,11 @@ struct mat_t
     float val[3][3];
 };
 
+#ifdef ALTERA_CL
 __attribute__((task))
+#endif
 __kernel void find_inliers(
         const uint n_matches,
-        const uint cl_n_matches,
         const uint iters_per_batch,
         __global const float * restrict match_u1p,
         __global const float * restrict match_v1p,
@@ -17,13 +18,13 @@ __kernel void find_inliers(
         const float thresh,
         __global const struct mat_t * restrict fund_mats,
         __global uchar * restrict inlier_mask,
-        __global ushort * restrict counts
+        __global ushort * restrict counts,
+        __global uchar * restrict best_inliers,
+        __global ushort * restrict prev_best_count
     )
 {
     for (uint iter=0; iter<iters_per_batch; iter++)
     {
-        const uint inlier_offset = iter*cl_n_matches;
-
         // extract fundamental matrix
         const struct mat_t f = fund_mats[iter];
 
@@ -54,29 +55,17 @@ __kernel void find_inliers(
 
             // check threshold
             bool is_inlier = fabs(d) < thresh;
-            inlier_mask[inlier_offset + match_id] = is_inlier;
+            inlier_mask[iter*n_matches + match_id] = is_inlier;
             if (is_inlier) n_inliers++;
         }
 
         counts[iter] = n_inliers;
     }
-}
 
-__kernel __attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
-void update_best_inliers(
-        __global const uchar * restrict inliers,
-        __global const ushort * restrict counts,
-        const uint iters_per_batch,
-        const uint p_matched_size,
-        const uint batch_width,
-        __global uchar * restrict best_inliers,
-        __global ushort * restrict local_best_count
-    )
-{
-    ushort best_count = local_best_count[get_group_id(0)];
-
+    ushort best_count = *prev_best_count;
     int best_iter = -1;
-    for (unsigned i=0; i<iters_per_batch; i++)
+
+    for (uint i=0; i<iters_per_batch; i++)
     {
         const ushort iter_count = counts[i];
         if (iter_count > best_count)
@@ -86,14 +75,12 @@ void update_best_inliers(
         }
     }
 
-    barrier(CLK_GLOBAL_MEM_FENCE);
-
-    if (get_global_id(0) < p_matched_size)
+    if (best_iter != -1)
     {
-        if (best_iter != -1)
+        *prev_best_count = best_count;
+        for (uint i=0; i<n_matches; i++)
         {
-            best_inliers[get_global_id(0)] = inliers[best_iter*batch_width+get_global_id(0)];
-            if (get_local_id(0) == 0) local_best_count[get_group_id(0)] = best_count;
+            best_inliers[i] = inlier_mask[best_iter*n_matches+i];
         }
     }
 }
