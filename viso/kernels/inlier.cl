@@ -6,18 +6,23 @@ struct mat_t
     float val[3][3];
 };
 
+struct match_t
+{
+    float u1p;
+    float v1p;
+    float u1c;
+    float v1c;
+};
+
 #ifdef ALTERA_CL
 __attribute__((task))
 #endif
 __kernel void find_inliers(
         const uint n_matches,
         const uint iters_per_batch,
-        __global const float * restrict match_u1p,
-        __global const float * restrict match_v1p,
-        __global const float * restrict match_u1c,
-        __global const float * restrict match_v1c,
-        const float thresh,
+        __global const struct match_t * restrict matches,
         __global const struct mat_t * restrict fund_mats,
+        const float thresh,
         __global uchar * restrict return_best_inliers,
         __global ushort * restrict prev_best_count
     )
@@ -37,10 +42,11 @@ __kernel void find_inliers(
         for (uint match_id=0; match_id<n_matches; match_id++)
         {
             // extract matches
-            const float u1 = match_u1p[ match_id ];
-            const float v1 = match_v1p[ match_id ];
-            const float u2 = match_u1c[ match_id ];
-            const float v2 = match_v1c[ match_id ];
+            const struct match_t match = matches[ match_id ];
+            const float u1 = match.u1p;
+            const float v1 = match.v1p;
+            const float u2 = match.u1c;
+            const float v2 = match.v1c;
 
             // F*x1
             const float Fx1u = f.val[0][0]*u1 + f.val[0][1]*v1 + f.val[0][2];

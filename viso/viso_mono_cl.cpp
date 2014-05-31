@@ -12,22 +12,24 @@ private:
     const unsigned n_matches;
     const unsigned iters_per_batch;
 
-    OpenCL::Buffer<cl_float> buff_match_u1p;
-    OpenCL::Buffer<cl_float> buff_match_v1p;
-    OpenCL::Buffer<cl_float> buff_match_u1c;
-    OpenCL::Buffer<cl_float> buff_match_v1c;
+    typedef Matcher::p_match match_t;
+    struct cl_match_t
+    {
+        cl_float u1p;
+        cl_float v1p;
+        cl_float u1c;
+        cl_float v1c;
+    };
 
+    OpenCL::Buffer<cl_match_t> buff_matches;
     OpenCL::Buffer<cl_float> buff_fund_mat;
     OpenCL::Buffer<cl_uchar> buff_best_inlier_mask;
     OpenCL::Buffer<cl_ushort> buff_best_count;
 
     std::vector<cl::Event> update_deps;
 
-    typedef Matcher::p_match match_t;
-    const std::vector<cl_float> match_u1p;
-    const std::vector<cl_float> match_v1p;
-    const std::vector<cl_float> match_u1c;
-    const std::vector<cl_float> match_v1c;
+
+    const std::vector<cl_match_t> matches;
     const std::vector<cl_ushort> zeros;
 
     template <typename oT, typename iT>
@@ -47,34 +49,22 @@ public:
         ,   kernel_get_inlier (cl_container.getKernel("inlier.cl", "find_inliers"))
         ,   n_matches (p_matched.size())
         ,   iters_per_batch (iters_per_batch)
-        ,   buff_match_u1p (cl_container, CL_MEM_READ_ONLY, n_matches)
-        ,   buff_match_v1p (cl_container, CL_MEM_READ_ONLY, n_matches)
-        ,   buff_match_u1c (cl_container, CL_MEM_READ_ONLY, n_matches)
-        ,   buff_match_v1c (cl_container, CL_MEM_READ_ONLY, n_matches)
+        ,   buff_matches (cl_container, CL_MEM_READ_ONLY, n_matches)
         ,   buff_fund_mat (cl_container, CL_MEM_READ_ONLY, 9*iters_per_batch)
         ,   buff_best_inlier_mask (cl_container, CL_MEM_WRITE_ONLY, n_matches)
         ,   buff_best_count (cl_container, CL_MEM_READ_WRITE, 1)
-        ,   match_u1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1p;}))
-        ,   match_v1p (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1p;}))
-        ,   match_u1c (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.u1c;}))
-        ,   match_v1c (map<cl_float,match_t> (p_matched, [](const match_t &p) {return p.v1c;}))
+        ,   matches (map<cl_match_t,match_t> (p_matched, [](const match_t &p) {return cl_match_t{p.u1p, p.v1p, p.u1c, p.v1c};}))
         ,   zeros (1, 0)
     {
-        update_deps.push_back( buff_match_u1p.write(match_u1p.data()) );
-        update_deps.push_back( buff_match_v1p.write(match_v1p.data()) );
-        update_deps.push_back( buff_match_u1c.write(match_u1c.data()) );
-        update_deps.push_back( buff_match_v1c.write(match_v1c.data()) );
+        update_deps.push_back( buff_matches.write(matches.data()) );
         update_deps.push_back( buff_best_count.write(zeros.data()) );
 
         kernel_get_inlier
                 .arg(cl_uint(n_matches))
                 .arg(cl_uint(iters_per_batch))
-                .arg(buff_match_u1p)
-                .arg(buff_match_v1p)
-                .arg(buff_match_u1c)
-                .arg(buff_match_v1c)
-                .arg(cl_float(inlier_threshold))
+                .arg(buff_matches)
                 .arg(buff_fund_mat)
+                .arg(cl_float(inlier_threshold))
                 .arg(buff_best_inlier_mask)
                 .arg(buff_best_count)
                 ;
