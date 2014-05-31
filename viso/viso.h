@@ -124,7 +124,7 @@ protected:
   virtual std::vector<double> estimateMotion (std::vector<Matcher::p_match> p_matched) = 0;
   
   // get random and unique sample of num numbers from 1:N
-  std::vector<int32_t> getRandomSample (int32_t N,int32_t num);
+  std::vector<int> getRandomSample(unsigned N, unsigned num);
 
   Matrix                         Tr_delta;   // transformation (previous -> current frame)  
   bool                           Tr_valid;   // motion estimate exists?
