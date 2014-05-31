@@ -83,24 +83,20 @@ Matrix VisualOdometry::transformationVectorToMatrix (vector<double> tr) {
   return Tr;
 }
 
-vector<int32_t> VisualOdometry::getRandomSample(int32_t N,int32_t num) {
+std::vector<int> VisualOdometry::getRandomSample(unsigned N, unsigned num) {
 
-  // init sample and totalset
-  vector<int32_t> sample;
-  vector<int32_t> totalset;
-  
-  // create vector containing all indices
-  for (int32_t i=0; i<N; i++)
-    totalset.push_back(i);
+    static std::default_random_engine generator (71);
+    std::vector<int> totalset(N);
 
-  // add num indices to current sample
-  sample.clear();
-  for (int32_t i=0; i<num; i++) {
-    int32_t j = rand()%totalset.size();
-    sample.push_back(totalset[j]);
-    totalset.erase(totalset.begin()+j);
-  }
-  
-  // return sample
-  return sample;
+    for (unsigned i=0; i<N; i++) totalset[i] = i;
+
+    for (unsigned i=0; i<num; i++)
+    {
+        std::uniform_int_distribution<unsigned> distribution(i, N-1);
+        std::swap(totalset.at(i), totalset.at(distribution(generator)));
+    }
+
+    std::vector<int> sample (totalset.begin(), totalset.begin()+num);
+
+    return sample;
 }

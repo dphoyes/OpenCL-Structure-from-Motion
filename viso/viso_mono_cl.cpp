@@ -1,4 +1,5 @@
 #include <viso_mono_cl.h>
+#include "timer.hh"
 
 using namespace std;
 
