@@ -19,3 +19,42 @@ __kernel void plane_calc_dists(
         out[gid1*stride + gid0] = val;
     }
 }
+
+
+__attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
+__kernel void plane_sum(
+        __global const double * restrict in,
+        const uint stride,
+        const uint n_to_sum,
+        __global double * restrict out
+    )
+{
+    __local double tmp[WORK_GROUP_SIZE];
+
+    const uint base_offset = get_group_id(0)*stride;
+
+    double sum = 0;
+    for (uint i=get_local_id(0); i<n_to_sum; i+=get_local_size(0))
+    {
+        sum += in[base_offset+i];
+    }
+
+    tmp[get_local_id(0)] = sum;
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (uint stride = get_local_size(0)/2; stride > 0; stride /= 2)
+    {
+        if (get_local_id(0) < stride)
+        {
+            tmp[get_local_id(0)] += tmp[get_local_id(0) + stride];
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (get_local_id(0) == 0)
+    {
+        out[get_group_id(0)] = tmp[0];
+    }
+}

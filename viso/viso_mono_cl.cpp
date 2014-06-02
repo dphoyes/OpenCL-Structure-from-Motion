@@ -166,50 +166,65 @@ private:
     OpenCL::Container &cl_container;
 
     OpenCL::Kernel kernel_calc_dists;
+    OpenCL::Kernel kernel_sum;
 
     const Matrix &d;
 
     const unsigned d_len;
     const size_t work_group_size;
-    const size_t cl_n_groups;
+    const size_t cl_calc_n_groups;
+    const size_t cl_sum_n_groups;
 
     OpenCL::Buffer<cl_double> buff_d;
-    OpenCL::Buffer<cl_double> buff_out;
+    OpenCL::Buffer<cl_double> buff_dists;
+    OpenCL::Buffer<cl_double> buff_sums;
 
 public:
     CLBestPlaneFinder(OpenCL::Container &cl_container, const Matrix &d, double weight)
         :   cl_container (cl_container)
         ,   kernel_calc_dists (cl_container.getKernel("plane_and_inliers.cl", "plane_calc_dists"))
+        ,   kernel_sum (cl_container.getKernel("plane_and_inliers.cl", "plane_sum"))
         ,   d (d)
         ,   d_len ((d.n+1)&~1)
         ,   work_group_size (kernel_calc_dists.local_size[0])
-        ,   cl_n_groups ((d_len*d_len + work_group_size - 1)/work_group_size)
+        ,   cl_calc_n_groups ((d_len*d_len + work_group_size - 1)/work_group_size)
+        ,   cl_sum_n_groups (d_len)
         ,   buff_d (cl_container, CL_MEM_READ_ONLY, d_len)
-        ,   buff_out (cl_container, CL_MEM_WRITE_ONLY, d_len*d_len)
+        ,   buff_dists (cl_container, CL_MEM_READ_WRITE, d_len*d_len)
+        ,   buff_sums (cl_container, CL_MEM_WRITE_ONLY, d_len)
     {
-        kernel_calc_dists.setRange(cl::NDRange(cl_n_groups * work_group_size))
+        kernel_calc_dists.setRange(cl::NDRange(cl_calc_n_groups * work_group_size))
                 .arg(buff_d)
                 .arg(d_len)
                 .arg(weight)
-                .arg(buff_out)
+                .arg(buff_dists)
+                ;
+
+        kernel_sum.setRange(cl::NDRange(cl_sum_n_groups * work_group_size))
+                .arg(buff_dists)
+                .arg(d_len)
+                .arg(d.n)
+                .arg(buff_sums)
                 ;
     }
 
-    Matrix get_dists()
+    std::vector<double> get_dist_sums()
     {
         cl::Event write_event = buff_d.write(&d.val[0][0]);
         cl::Event calc_event = kernel_calc_dists.start({write_event});
+        cl::Event sum_event = kernel_sum.start({calc_event});
 
-        Matrix dists(d_len, d_len);
-        cl::Event read_event = buff_out.read_into(&dists.val[0][0], {calc_event});
+        std::vector<double> sums (d_len);
+        cl::Event read_event = buff_sums.read_into(sums.data(), {sum_event});
         read_event.wait();
 
         std::cout << "write: " << cl_container.durationOfEvent(write_event) << "  ";
         std::cout << "calc: " << cl_container.durationOfEvent(calc_event) << "  ";
+        std::cout << "sum: " << cl_container.durationOfEvent(sum_event) << "  ";
         std::cout << "read: " << unsigned(cl_container.durationOfEvent(read_event)) << "  ";
         std::cout << std::endl;
 
-        return dists;
+        return sums;
     }
 };
 
@@ -217,7 +232,7 @@ public:
 int32_t VisualOdometryMono_CL::findBestPlane(const Matrix &d, double median, double weight)
 {
     CLBestPlaneFinder plane_finder(cl_container, d, weight);
-    const Matrix dists = plane_finder.get_dists();
+    const auto dist_sums = plane_finder.get_dist_sums();
 
     double   best_sum = 0;
     int32_t  best_idx = 0;
@@ -226,11 +241,7 @@ int32_t VisualOdometryMono_CL::findBestPlane(const Matrix &d, double median, dou
     {
         if (d.val[0][i] > median/param.motion_threshold)
         {
-            double sum = 0;
-            for (int32_t j=0; j<d.n; j++)
-            {
-                sum += dists.val[i][j];
-            }
+            double sum = dist_sums[i];
             if (sum>best_sum)
             {
                 best_sum = sum;
