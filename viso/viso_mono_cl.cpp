@@ -185,7 +185,7 @@ public:
         ,   kernel_calc_dists (cl_container.getKernel("plane_and_inliers.cl", "plane_calc_dists"))
         ,   kernel_sum (cl_container.getKernel("plane_and_inliers.cl", "plane_sum"))
         ,   d (d)
-        ,   d_len ((d.n+1)&~1)
+        ,   d_len (d.n)
         ,   work_group_size (kernel_calc_dists.local_size[0])
         ,   cl_calc_n_groups ((d_len*d_len + work_group_size - 1)/work_group_size)
         ,   cl_sum_n_groups ((d_len + work_group_size - 1)/work_group_size)
