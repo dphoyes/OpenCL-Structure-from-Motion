@@ -2,7 +2,7 @@
 #define WORK_GROUP_SIZE 128
 
 
-__attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
+__attribute__((reqd_work_group_size(1, 1, 1)))
 __kernel void plane_calc_dists(
         __global const double * restrict d,
         const uint stride,
@@ -20,8 +20,7 @@ __kernel void plane_calc_dists(
     }
 }
 
-
-__attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
+__attribute__((reqd_work_group_size(1, 1, 1)))
 __kernel void plane_sum(
         __global const double * restrict in,
         const uint stride,
