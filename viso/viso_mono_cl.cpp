@@ -171,8 +171,7 @@ private:
 
     const unsigned d_len;
     const size_t work_group_size;
-    const size_t cl_groups_per_dim;
-    const size_t cl_d_len;
+    const size_t cl_n_groups;
 
     OpenCL::Buffer<cl_double> buff_d;
     OpenCL::Buffer<cl_double> buff_out;
@@ -184,12 +183,11 @@ public:
         ,   d (d)
         ,   d_len ((d.n+1)&~1)
         ,   work_group_size (kernel_calc_dists.local_size[0])
-        ,   cl_groups_per_dim ((d_len + work_group_size - 1)/work_group_size)
-        ,   cl_d_len (cl_groups_per_dim * work_group_size)
+        ,   cl_n_groups ((d_len*d_len + work_group_size - 1)/work_group_size)
         ,   buff_d (cl_container, CL_MEM_READ_ONLY, d_len)
         ,   buff_out (cl_container, CL_MEM_WRITE_ONLY, d_len*d_len)
     {
-        kernel_calc_dists.setRange(cl::NDRange(cl_d_len, cl_d_len))
+        kernel_calc_dists.setRange(cl::NDRange(cl_n_groups * work_group_size))
                 .arg(buff_d)
                 .arg(d_len)
                 .arg(weight)

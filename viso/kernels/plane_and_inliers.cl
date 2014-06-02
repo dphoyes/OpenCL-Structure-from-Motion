@@ -10,8 +10,8 @@ __kernel void plane_calc_dists(
         __global double * restrict out
     )
 {
-    uint gid0 = get_global_id(0);
-    uint gid1 = get_global_id(1);
+    uint gid0 = get_global_id(0)%stride;
+    uint gid1 = get_global_id(0)/stride;
     if (gid0 < stride && gid1 < stride)
     {
         double dist = d[gid0] - d[gid1];

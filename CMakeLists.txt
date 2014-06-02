@@ -20,7 +20,7 @@ function(cl2aocxmap NAME DIR OUT_FILE)
 file(GLOB SHADER_SRC_FILES ${DIR}/*)
 add_custom_command(
     OUTPUT ${OUT_FILE}
-    COMMAND cl2aocxmap ${CMAKE_CURRENT_SOURCE_DIR}/${DIR} ${NAME} ${OUT_FILE} -fp-relaxed=true
+    COMMAND cl2aocxmap ${CMAKE_CURRENT_SOURCE_DIR}/${DIR} ${NAME} ${OUT_FILE} -fp-relaxed=true -fpc=true
     DEPENDS ${SHADER_SRC_FILES}
 )
 endfunction(cl2aocxmap)
