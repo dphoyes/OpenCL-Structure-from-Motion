@@ -10,7 +10,8 @@ class VisualOdometryMono_CL : public VisualOdometryMono
 private:
     OpenCL::Container &cl_container;
 
-    Matrix ransacEstimateF(const std::vector<Matcher::p_match> &p_matched) override;
+    Matrix ransacEstimateF_disabled(const std::vector<Matcher::p_match> &p_matched);
+    int32_t findBestPlane(const Matrix &d, double median, double weight) override;
 
 public:
     VisualOdometryMono_CL (parameters param, OpenCL::Container &cl_container)

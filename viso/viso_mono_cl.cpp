@@ -47,7 +47,7 @@ private:
 public:
     CLInlierFinder(const vector<Matcher::p_match> &p_matched, OpenCL::Container &cl_container, unsigned iters_per_batch, float inlier_threshold)
         :   cl_container (cl_container)
-        ,   kernel_get_inlier (cl_container.getKernel("inlier.cl", "find_inliers"))
+        ,   kernel_get_inlier (cl_container.getKernel("plane_and_inliers.cl", "find_inliers"))
         ,   n_matches (p_matched.size())
         ,   iters_per_batch (iters_per_batch)
         ,   buff_matches (cl_container, CL_MEM_READ_ONLY, n_matches)
@@ -115,7 +115,7 @@ public:
 
 };
 
-Matrix VisualOdometryMono_CL::ransacEstimateF(const vector<Matcher::p_match> &p_matched)
+Matrix VisualOdometryMono_CL::ransacEstimateF_disabled(const vector<Matcher::p_match> &p_matched)
 {
 #ifdef __arm__
     static const unsigned iters_per_batch = 2048;
@@ -158,4 +158,88 @@ Matrix VisualOdometryMono_CL::ransacEstimateF(const vector<Matcher::p_match> &p_
     return F;
 }
 
+
+
+class CLBestPlaneFinder
+{
+private:
+    OpenCL::Container &cl_container;
+
+    OpenCL::Kernel kernel_calc_dists;
+
+    const Matrix &d;
+
+    const unsigned d_len;
+    const size_t work_group_size;
+    const size_t cl_groups_per_dim;
+    const size_t cl_d_len;
+
+    OpenCL::Buffer<cl_double> buff_d;
+    OpenCL::Buffer<cl_double> buff_out;
+
+public:
+    CLBestPlaneFinder(OpenCL::Container &cl_container, const Matrix &d, double weight)
+        :   cl_container (cl_container)
+        ,   kernel_calc_dists (cl_container.getKernel("plane_and_inliers.cl", "plane_calc_dists"))
+        ,   d (d)
+        ,   d_len ((d.n+1)&~1)
+        ,   work_group_size (kernel_calc_dists.local_size[0])
+        ,   cl_groups_per_dim ((d_len + work_group_size - 1)/work_group_size)
+        ,   cl_d_len (cl_groups_per_dim * work_group_size)
+        ,   buff_d (cl_container, CL_MEM_READ_ONLY, d_len)
+        ,   buff_out (cl_container, CL_MEM_WRITE_ONLY, d_len*d_len)
+    {
+        kernel_calc_dists.setRange(cl::NDRange(cl_d_len, cl_d_len))
+                .arg(buff_d)
+                .arg(d_len)
+                .arg(weight)
+                .arg(buff_out)
+                ;
+    }
+
+    Matrix get_dists()
+    {
+        cl::Event write_event = buff_d.write(&d.val[0][0]);
+        cl::Event calc_event = kernel_calc_dists.start({write_event});
+
+        Matrix dists(d_len, d_len);
+        cl::Event read_event = buff_out.read_into(&dists.val[0][0], {calc_event});
+        read_event.wait();
+
+        std::cout << "write: " << cl_container.durationOfEvent(write_event) << "  ";
+        std::cout << "calc: " << cl_container.durationOfEvent(calc_event) << "  ";
+        std::cout << "read: " << unsigned(cl_container.durationOfEvent(read_event)) << "  ";
+        std::cout << std::endl;
+
+        return dists;
+    }
+};
+
+
+int32_t VisualOdometryMono_CL::findBestPlane(const Matrix &d, double median, double weight)
+{
+    CLBestPlaneFinder plane_finder(cl_container, d, weight);
+    const Matrix dists = plane_finder.get_dists();
+
+    double   best_sum = 0;
+    int32_t  best_idx = 0;
+
+    for (int32_t i=0; i<d.n; i++)
+    {
+        if (d.val[0][i] > median/param.motion_threshold)
+        {
+            double sum = 0;
+            for (int32_t j=0; j<d.n; j++)
+            {
+                sum += dists.val[i][j];
+            }
+            if (sum>best_sum)
+            {
+                best_sum = sum;
+                best_idx = i;
+            }
+        }
+    }
+    return best_idx;
+}
 
