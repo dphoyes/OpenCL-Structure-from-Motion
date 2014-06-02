@@ -26,35 +26,18 @@ __kernel void plane_sum(
         __global const double * restrict in,
         const uint stride,
         const uint n_to_sum,
-        __global double * restrict out
+        __global double * restrict sums
     )
 {
-    __local double tmp[WORK_GROUP_SIZE];
-
-    const uint base_offset = get_group_id(0)*stride;
-
-    double sum = 0;
-    for (uint i=get_local_id(0); i<n_to_sum; i+=get_local_size(0))
+    uint gid0 = get_global_id(0);
+    if (gid0 < stride)
     {
-        sum += in[base_offset+i];
-    }
-
-    tmp[get_local_id(0)] = sum;
-
-    barrier(CLK_LOCAL_MEM_FENCE);
-
-    for (uint stride = get_local_size(0)/2; stride > 0; stride /= 2)
-    {
-        if (get_local_id(0) < stride)
+        const uint input_offset = gid0*stride;
+        double sum = 0;
+        for (uint i=0; i<n_to_sum; i++)
         {
-            tmp[get_local_id(0)] += tmp[get_local_id(0) + stride];
+            sum += in[input_offset + i];
         }
-
-        barrier(CLK_LOCAL_MEM_FENCE);
-    }
-
-    if (get_local_id(0) == 0)
-    {
-        out[get_group_id(0)] = tmp[0];
+        sums[gid0] = sum;
     }
 }
