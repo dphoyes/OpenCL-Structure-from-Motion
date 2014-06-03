@@ -178,7 +178,7 @@ private:
     OpenCL::Buffer<cl_double> buff_sums;
 
 public:
-    CLBestPlaneFinder(OpenCL::Container &cl_container, const Matrix &d, double weight)
+    CLBestPlaneFinder(OpenCL::Container &cl_container, const Matrix &d, double weight, double threshold)
         :   cl_container (cl_container)
         ,   kernel_calc_dists (cl_container.getKernel("plane_and_inliers.cl", "plane_calc_sums"))
         ,   d (d)
@@ -191,8 +191,9 @@ public:
     {
         kernel_calc_dists.setRange(cl::NDRange(cl_d_len))
                 .arg(buff_d)
-                .arg(weight)
                 .arg(d_len)
+                .arg(threshold)
+                .arg(weight)
                 .arg(buff_sums)
                 ;
     }
@@ -218,7 +219,8 @@ public:
 
 int32_t VisualOdometryMono_CL::findBestPlane(const Matrix &d, double median, double weight)
 {
-    CLBestPlaneFinder plane_finder(cl_container, d, weight);
+    const double threshold = median/param.motion_threshold;
+    CLBestPlaneFinder plane_finder(cl_container, d, weight, threshold);
     const auto dist_sums = plane_finder.get_dist_sums();
 
     double   best_sum = 0;
@@ -226,14 +228,11 @@ int32_t VisualOdometryMono_CL::findBestPlane(const Matrix &d, double median, dou
 
     for (int32_t i=0; i<d.n; i++)
     {
-        if (d.val[0][i] > median/param.motion_threshold)
+        double sum = dist_sums[i];
+        if (sum>best_sum)
         {
-            double sum = dist_sums[i];
-            if (sum>best_sum)
-            {
-                best_sum = sum;
-                best_idx = i;
-            }
+            best_sum = sum;
+            best_idx = i;
         }
     }
     return best_idx;
