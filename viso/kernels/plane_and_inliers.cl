@@ -32,11 +32,10 @@ __kernel void plane_sum(
     uint gid0 = get_global_id(0);
     if (gid0 < stride)
     {
-        const uint input_offset = gid0*stride;
         double sum = 0;
         for (uint i=0; i<n_to_sum; i++)
         {
-            sum += in[input_offset + i];
+            sum += in[i*stride + gid0];
         }
         sums[gid0] = sum;
     }
