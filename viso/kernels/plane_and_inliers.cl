@@ -12,9 +12,12 @@ __kernel void plane_calc_dists(
 {
     uint gid0 = get_global_id(0)%stride;
     uint gid1 = get_global_id(0)/stride;
-    double dist = d[gid0] - d[gid1];
-    double val = exp(-dist*dist*weight);
-    out[gid1*stride + gid0] = val;
+    if (gid0 < stride && gid1 < stride)
+    {
+        double dist = d[gid0] - d[gid1];
+        double val = exp(-dist*dist*weight);
+        out[gid1*stride + gid0] = val;
+    }
 }
 
 __attribute__((reqd_work_group_size(1, 1, 1)))
@@ -26,10 +29,13 @@ __kernel void plane_sum(
     )
 {
     uint gid0 = get_global_id(0);
-    double sum = 0;
-    for (uint i=0; i<n_to_sum; i++)
+    if (gid0 < stride)
     {
-        sum += in[i*stride + gid0];
+        double sum = 0;
+        for (uint i=0; i<n_to_sum; i++)
+        {
+            sum += in[i*stride + gid0];
+        }
+        sums[gid0] = sum;
     }
-    sums[gid0] = sum;
 }
