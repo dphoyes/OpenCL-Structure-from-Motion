@@ -172,10 +172,8 @@ private:
 
     const unsigned d_len;
     const size_t work_group_size;
-    const size_t cl_calc_n_groups;
     const size_t cl_sum_n_groups;
     const size_t cl_d_len;
-    const size_t cl_d_len_squared;
 
     OpenCL::Buffer<cl_double> buff_d;
     OpenCL::Buffer<cl_double> buff_dists;
@@ -189,24 +187,20 @@ public:
         ,   d (d)
         ,   d_len (d.n)
         ,   work_group_size (kernel_calc_dists.local_size[0])
-        ,   cl_calc_n_groups ((d_len*d_len + work_group_size - 1)/work_group_size)
         ,   cl_sum_n_groups ((d_len + work_group_size - 1)/work_group_size)
         ,   cl_d_len (cl_sum_n_groups * work_group_size)
-        ,   cl_d_len_squared (cl_calc_n_groups * work_group_size)
         ,   buff_d (cl_container, CL_MEM_READ_ONLY, d_len)
-        ,   buff_dists (cl_container, CL_MEM_READ_WRITE, cl_d_len_squared)
+        ,   buff_dists (cl_container, CL_MEM_READ_WRITE, cl_d_len*cl_d_len)
         ,   buff_sums (cl_container, CL_MEM_WRITE_ONLY, cl_d_len)
     {
-        kernel_calc_dists.setRange(cl::NDRange(cl_d_len_squared))
+        kernel_calc_dists.setRange(cl::NDRange(cl_d_len, cl_d_len))
                 .arg(buff_d)
-                .arg(d_len)
                 .arg(weight)
                 .arg(buff_dists)
                 ;
 
         kernel_sum.setRange(cl::NDRange(cl_d_len))
                 .arg(buff_dists)
-                .arg(d_len)
                 .arg(d_len)
                 .arg(buff_sums)
                 ;
