@@ -9,15 +9,18 @@ __attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
 __kernel void plane_calc_dists(
         __global const double * restrict d,
         const double weight,
+        const uint d_len,
         __global double * restrict out
     )
 {
     const uint gid0 = get_global_id(0);
-    const uint gid1 = get_global_id(1);
     const uint stride = get_global_size(0);
-    const double dist = d[gid0] - d[gid1];
-    const double val = exp(-dist*dist*weight);
-    out[gid1*stride + gid0] = val;
+    for (uint i=0; i<d_len; i++)
+    {
+        const double dist = d[gid0] - d[i];
+        const double val = exp(-dist*dist*weight);
+        out[i*stride + gid0] = val;
+    }
 }
 
 

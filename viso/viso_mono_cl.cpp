@@ -193,9 +193,10 @@ public:
         ,   buff_dists (cl_container, CL_MEM_READ_WRITE, cl_d_len*cl_d_len)
         ,   buff_sums (cl_container, CL_MEM_WRITE_ONLY, cl_d_len)
     {
-        kernel_calc_dists.setRange(cl::NDRange(cl_d_len, cl_d_len))
+        kernel_calc_dists.setRange(cl::NDRange(cl_d_len))
                 .arg(buff_d)
                 .arg(weight)
+                .arg(d_len)
                 .arg(buff_dists)
                 ;
 
