@@ -166,7 +166,6 @@ private:
     OpenCL::Container &cl_container;
 
     OpenCL::Kernel kernel_calc_dists;
-    OpenCL::Kernel kernel_sum;
 
     const Matrix &d;
 
@@ -176,32 +175,23 @@ private:
     const size_t cl_d_len;
 
     OpenCL::Buffer<cl_double> buff_d;
-    OpenCL::Buffer<cl_double> buff_dists;
     OpenCL::Buffer<cl_double> buff_sums;
 
 public:
     CLBestPlaneFinder(OpenCL::Container &cl_container, const Matrix &d, double weight)
         :   cl_container (cl_container)
-        ,   kernel_calc_dists (cl_container.getKernel("plane_and_inliers.cl", "plane_calc_dists"))
-        ,   kernel_sum (cl_container.getKernel("plane_and_inliers.cl", "plane_sum"))
+        ,   kernel_calc_dists (cl_container.getKernel("plane_and_inliers.cl", "plane_calc_sums"))
         ,   d (d)
         ,   d_len (d.n)
         ,   work_group_size (kernel_calc_dists.local_size[0])
         ,   cl_sum_n_groups ((d_len + work_group_size - 1)/work_group_size)
         ,   cl_d_len (cl_sum_n_groups * work_group_size)
         ,   buff_d (cl_container, CL_MEM_READ_ONLY, d_len)
-        ,   buff_dists (cl_container, CL_MEM_READ_WRITE, cl_d_len*cl_d_len)
         ,   buff_sums (cl_container, CL_MEM_WRITE_ONLY, cl_d_len)
     {
         kernel_calc_dists.setRange(cl::NDRange(cl_d_len))
                 .arg(buff_d)
                 .arg(weight)
-                .arg(d_len)
-                .arg(buff_dists)
-                ;
-
-        kernel_sum.setRange(cl::NDRange(cl_d_len))
-                .arg(buff_dists)
                 .arg(d_len)
                 .arg(buff_sums)
                 ;
@@ -211,15 +201,13 @@ public:
     {
         cl::Event write_event = buff_d.write(&d.val[0][0]);
         cl::Event calc_event = kernel_calc_dists.start({write_event});
-        cl::Event sum_event = kernel_sum.start({calc_event});
 
         std::vector<double> sums (cl_d_len);
-        cl::Event read_event = buff_sums.read_into(sums.data(), {sum_event});
+        cl::Event read_event = buff_sums.read_into(sums.data(), {calc_event});
         read_event.wait();
 
         std::cout << "write: " << cl_container.durationOfEvent(write_event) << "  ";
         std::cout << "calc: " << cl_container.durationOfEvent(calc_event) << "  ";
-        std::cout << "sum: " << cl_container.durationOfEvent(sum_event) << "  ";
         std::cout << "read: " << unsigned(cl_container.durationOfEvent(read_event)) << "  ";
         std::cout << std::endl;
 
