@@ -23,7 +23,7 @@ __kernel void plane_calc_dists(
 #ifdef ALTERA_CL
 __attribute__((num_simd_work_items(2)))
 #endif
-__attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
+__attribute__((reqd_work_group_size(2, 1, 1)))
 __kernel void plane_sum(
         __global const double * restrict in,
         const uint stride,
