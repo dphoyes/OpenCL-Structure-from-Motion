@@ -174,6 +174,8 @@ private:
     const size_t work_group_size;
     const size_t cl_calc_n_groups;
     const size_t cl_sum_n_groups;
+    const size_t cl_d_len;
+    const size_t cl_d_len_squared;
 
     OpenCL::Buffer<cl_double> buff_d;
     OpenCL::Buffer<cl_double> buff_dists;
@@ -185,25 +187,27 @@ public:
         ,   kernel_calc_dists (cl_container.getKernel("plane_and_inliers.cl", "plane_calc_dists"))
         ,   kernel_sum (cl_container.getKernel("plane_and_inliers.cl", "plane_sum"))
         ,   d (d)
-        ,   d_len ((d.n+1)&~1)
+        ,   d_len (d.n)
         ,   work_group_size (kernel_calc_dists.local_size[0])
         ,   cl_calc_n_groups ((d_len*d_len + work_group_size - 1)/work_group_size)
         ,   cl_sum_n_groups ((d_len + work_group_size - 1)/work_group_size)
+        ,   cl_d_len (cl_sum_n_groups * work_group_size)
+        ,   cl_d_len_squared (cl_calc_n_groups * work_group_size)
         ,   buff_d (cl_container, CL_MEM_READ_ONLY, d_len)
-        ,   buff_dists (cl_container, CL_MEM_READ_WRITE, d_len*d_len)
-        ,   buff_sums (cl_container, CL_MEM_WRITE_ONLY, d_len)
+        ,   buff_dists (cl_container, CL_MEM_READ_WRITE, cl_d_len_squared)
+        ,   buff_sums (cl_container, CL_MEM_WRITE_ONLY, cl_d_len)
     {
-        kernel_calc_dists.setRange(cl::NDRange(cl_calc_n_groups * work_group_size))
+        kernel_calc_dists.setRange(cl::NDRange(cl_d_len_squared))
                 .arg(buff_d)
                 .arg(d_len)
                 .arg(weight)
                 .arg(buff_dists)
                 ;
 
-        kernel_sum.setRange(cl::NDRange(cl_sum_n_groups * work_group_size))
+        kernel_sum.setRange(cl::NDRange(cl_d_len))
                 .arg(buff_dists)
                 .arg(d_len)
-                .arg(d.n)
+                .arg(d_len)
                 .arg(buff_sums)
                 ;
     }
@@ -214,7 +218,7 @@ public:
         cl::Event calc_event = kernel_calc_dists.start({write_event});
         cl::Event sum_event = kernel_sum.start({calc_event});
 
-        std::vector<double> sums (d_len);
+        std::vector<double> sums (cl_d_len);
         cl::Event read_event = buff_sums.read_into(sums.data(), {sum_event});
         read_event.wait();
 
