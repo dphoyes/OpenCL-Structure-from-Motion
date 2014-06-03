@@ -32,10 +32,13 @@ __kernel void plane_sum(
     )
 {
     uint gid0 = get_global_id(0);
-    double sum = 0;
-    for (uint i=0; i<n_to_sum; i++)
+    if (gid0 < stride)
     {
-        sum += in[i*stride + gid0];
+        double sum = 0;
+        for (uint i=0; i<n_to_sum; i++)
+        {
+            sum += in[i*stride + gid0];
+        }
+        sums[gid0] = sum;
     }
-    sums[gid0] = sum;
 }
