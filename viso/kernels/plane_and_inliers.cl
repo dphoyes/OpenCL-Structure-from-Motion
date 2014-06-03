@@ -23,7 +23,7 @@ __kernel void plane_calc_sums(
     {
         const double dist = d_gid0 - d[i];
         const double val = exp(-dist*dist*weight);
-        sum += val;
+        if (active) sum += val;
     }
-    sums[gid0] = active ? sum : 0;
+    sums[gid0] = sum;
 }
