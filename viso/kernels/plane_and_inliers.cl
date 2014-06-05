@@ -3,7 +3,7 @@
 
 
 #ifdef ALTERA_CL
-__attribute__((num_simd_work_items(2)))
+__attribute__((num_simd_work_items(1)))
 #endif
 __attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
 __kernel void plane_calc_sums(
