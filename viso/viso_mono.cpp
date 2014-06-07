@@ -71,13 +71,18 @@ Matrix VisualOdometryMono::ransacEstimateF(const vector<Matcher::p_match> &p_mat
     return F;
 }
 
-int32_t VisualOdometryMono::findBestPlane(const Matrix &d, double median, double weight)
+double VisualOdometryMono::findBestPlane(const Matrix &x_plane, double threshold, double weight)
 {
+    Matrix n(2,1);
+    n.val[0][0]       = cos(-param.pitch);
+    n.val[1][0]       = sin(-param.pitch);
+    Matrix   d        = ~n*x_plane;
+
     double   best_sum = 0;
     int32_t  best_idx = 0;
 
     for (int32_t i=0; i<d.n; i++) {
-      if (d.val[0][i]>median/param.motion_threshold) {
+      if (d.val[0][i]>threshold) {
         double sum = 0;
         for (int32_t j=0; j<d.n; j++) {
           double dist = d.val[0][j]-d.val[0][i];
@@ -89,7 +94,7 @@ int32_t VisualOdometryMono::findBestPlane(const Matrix &d, double median, double
         }
       }
     }
-    return best_idx;
+    return d.val[0][best_idx];
 }
 
 vector<double> VisualOdometryMono::estimateMotion (vector<Matcher::p_match> p_matched) {
@@ -157,16 +162,13 @@ vector<double> VisualOdometryMono::estimateMotion (vector<Matcher::p_match> p_ma
 
   StartTimer best_plane_timer("Best plane time");
   
-  Matrix n(2,1);
-  n.val[0][0]       = cos(-param.pitch);
-  n.val[1][0]       = sin(-param.pitch);
-  Matrix   d        = ~n*x_plane;
-  double   sigma    = median/50.0;
-  double   weight   = 1.0/(2.0*sigma*sigma);
+  double sigma     = median/50.0;
+  double weight    = 1.0/(2.0*sigma*sigma);
+  double threshold = median/param.motion_threshold;
 
   // find best plane
-  int32_t best_idx = findBestPlane(d, median, weight);
-  t = t*param.height/d.val[0][best_idx];
+  double best_d = findBestPlane(x_plane, threshold, weight);
+  t = t*param.height/best_d;
 
   best_plane_timer.end();
   
