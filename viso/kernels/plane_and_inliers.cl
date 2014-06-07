@@ -29,8 +29,7 @@ __kernel void plane_calc_sums(
             sub_sum += (i+s < d_len) ? val[s] : 0;
         }
 
-        if (active) sum += sub_sum;
+        sum += sub_sum;
     }
-    sums[gid0] = sum;
+    sums[gid0] = active ? sum : 0;
 }
-
