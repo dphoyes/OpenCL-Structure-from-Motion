@@ -86,6 +86,7 @@ public:
     Container &cl_container;
     size_t size;
     cl::Buffer buff;
+    unsigned queue_id = 0;
 
     Buffer(Container &cl_container, cl_mem_flags flags, unsigned N)
         :   cl_container (cl_container)
@@ -93,17 +94,23 @@ public:
         ,   buff(cl_container.context, flags, size)
     {}
 
+    Buffer& setQueue(const unsigned id)
+    {
+        queue_id = id;
+        return *this;
+    }
+
     cl::Event write(const void *data, const std::vector<cl::Event> &deps = {})
     {
         cl::Event ev;
-        cl_container.queues[0].enqueueWriteBuffer(buff, CL_FALSE, 0, size, data, &deps, &ev);
+        cl_container.queues[queue_id].enqueueWriteBuffer(buff, CL_FALSE, 0, size, data, &deps, &ev);
         return ev;
     }
 
     cl::Event read_into(void *data, const std::vector<cl::Event> &deps = {})
     {
         cl::Event ev;
-        cl_container.queues[0].enqueueReadBuffer(buff, CL_FALSE, 0, size, data, &deps, &ev);
+        cl_container.queues[queue_id].enqueueReadBuffer(buff, CL_FALSE, 0, size, data, &deps, &ev);
         return ev;
     }
 };
