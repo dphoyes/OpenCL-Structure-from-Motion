@@ -166,7 +166,6 @@ private:
     OpenCL::Container &cl_container;
 
     OpenCL::Kernel kernel_calc;
-    OpenCL::Task kernel_find;
 
     const unsigned d_len;
     const size_t work_group_size;
@@ -174,45 +173,35 @@ private:
     const size_t cl_d_len;
 
     OpenCL::Buffer<cl_double> buff_d;
-    OpenCL::Buffer<cl_uint> buff_best;
+    OpenCL::Buffer<cl_double> buff_sums;
 
 public:
     CLBestPlaneFinder(OpenCL::Container &cl_container, unsigned d_len, double weight, double threshold)
         :   cl_container (cl_container)
         ,   kernel_calc (cl_container.getKernel("plane_and_inliers.cl", "plane_calc_sums"))
-        ,   kernel_find (cl_container.getKernel("plane_and_inliers.cl", "find_best_idx"))
         ,   d_len (d_len)
         ,   work_group_size (kernel_calc.local_size[0])
         ,   cl_sum_n_groups ((d_len + work_group_size - 1)/work_group_size)
         ,   cl_d_len (cl_sum_n_groups * work_group_size)
         ,   buff_d (cl_container, CL_MEM_READ_ONLY, d_len)
-        ,   buff_best (cl_container, CL_MEM_WRITE_ONLY, 1)
+        ,   buff_sums (cl_container, CL_MEM_WRITE_ONLY, cl_d_len)
     {
-
-        kernel_find.setQueue(1)
-                .arg(d_len)
-                .arg(buff_best)
-                .start()
-                ;
-
-        buff_best.setQueue(1);
-        buff_d.setQueue(0);
-
-        kernel_calc.setRange(cl::NDRange(cl_d_len)).setQueue(0)
+        kernel_calc.setRange(cl::NDRange(cl_d_len))
                 .arg(buff_d)
                 .arg(d_len)
                 .arg(threshold)
                 .arg(weight)
+                .arg(buff_sums)
                 ;
     }
 
-    unsigned get_best_idx(const vector<double> &d)
+    std::vector<double> get_sums(const vector<double> &d)
     {
         cl::Event write_event = buff_d.write(d.data());
         cl::Event calc_event = kernel_calc.start();
 
-        unsigned best_idx;
-        cl::Event read_event = buff_best.read_into(&best_idx);
+        std::vector<double> sums (cl_d_len);
+        cl::Event read_event = buff_sums.read_into(sums.data());
         read_event.wait();
 
         std::cout << "write: " << cl_container.durationOfEvent(write_event) << "  ";
@@ -220,7 +209,7 @@ public:
         std::cout << "read: " << unsigned(cl_container.durationOfEvent(read_event)) << "  ";
         std::cout << std::endl;
 
-        return best_idx;
+        return sums;
     }
 };
 
@@ -236,7 +225,20 @@ double VisualOdometryMono_CL::findBestPlane(const Matrix &x_plane, double thresh
     for (unsigned i=0; i<d.size(); i++) d[i] = c_pitch*x_plane.val[0][i];
     for (unsigned i=0; i<d.size(); i++) d[i] += s_pitch*x_plane.val[1][i];
 
-    const unsigned best_idx = plane_finder.get_best_idx(d);
+    const auto dist_sums = plane_finder.get_sums(d);
+
+    double   best_sum = 0;
+    int32_t  best_idx = 0;
+
+    for (unsigned i=0; i<d.size(); i++)
+    {
+        double sum = dist_sums[i];
+        if (sum>best_sum)
+        {
+            best_sum = sum;
+            best_idx = i;
+        }
+    }
     return d[best_idx];
 }
 
