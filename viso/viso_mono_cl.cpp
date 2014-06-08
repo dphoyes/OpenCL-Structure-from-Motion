@@ -172,11 +172,11 @@ private:
     const size_t cl_sum_n_groups;
     const size_t cl_d_len;
 
-    OpenCL::Buffer<cl_double> buff_d;
-    OpenCL::Buffer<cl_double> buff_sums;
+    OpenCL::Buffer<cl_float> buff_d;
+    OpenCL::Buffer<cl_float> buff_sums;
 
 public:
-    CLBestPlaneFinder(OpenCL::Container &cl_container, unsigned d_len, double weight, double threshold)
+    CLBestPlaneFinder(OpenCL::Container &cl_container, unsigned d_len, float weight, float threshold)
         :   cl_container (cl_container)
         ,   kernel_calc (cl_container.getKernel("plane_and_inliers.cl", "plane_calc_sums"))
         ,   d_len (d_len)
@@ -195,12 +195,12 @@ public:
                 ;
     }
 
-    std::vector<double> get_sums(const vector<double> &d)
+    std::vector<float> get_sums(const vector<float> &d)
     {
         cl::Event write_event = buff_d.write(d.data());
         cl::Event calc_event = kernel_calc.start();
 
-        std::vector<double> sums (cl_d_len);
+        std::vector<float> sums (cl_d_len);
         cl::Event read_event = buff_sums.read_into(sums.data());
         read_event.wait();
 
@@ -218,7 +218,7 @@ double VisualOdometryMono_CL::findBestPlane(const Matrix &x_plane, double thresh
 {
     CLBestPlaneFinder plane_finder(cl_container, x_plane.n, weight, threshold);
 
-    vector<double> d (x_plane.n);
+    vector<float> d (x_plane.n);
 
     const double s_pitch = sin(-param.pitch);
     const double c_pitch = cos(-param.pitch);
@@ -232,7 +232,7 @@ double VisualOdometryMono_CL::findBestPlane(const Matrix &x_plane, double thresh
 
     for (unsigned i=0; i<d.size(); i++)
     {
-        double sum = dist_sums[i];
+        float sum = dist_sums[i];
         if (sum>best_sum)
         {
             best_sum = sum;
