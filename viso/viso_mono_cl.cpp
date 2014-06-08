@@ -168,51 +168,48 @@ private:
     OpenCL::Kernel kernel_calc;
     OpenCL::Task kernel_find;
 
-    const vector<double> &d;
-
     const unsigned d_len;
     const size_t work_group_size;
     const size_t cl_sum_n_groups;
     const size_t cl_d_len;
 
     OpenCL::Buffer<cl_double> buff_d;
-    OpenCL::Buffer<cl_double> buff_sums;
     OpenCL::Buffer<cl_uint> buff_best;
 
 public:
-    CLBestPlaneFinder(OpenCL::Container &cl_container, const vector<double> &d, double weight, double threshold)
+    CLBestPlaneFinder(OpenCL::Container &cl_container, unsigned d_len, double weight, double threshold)
         :   cl_container (cl_container)
         ,   kernel_calc (cl_container.getKernel("plane_and_inliers.cl", "plane_calc_sums"))
         ,   kernel_find (cl_container.getKernel("plane_and_inliers.cl", "find_best_idx"))
-        ,   d (d)
-        ,   d_len (d.size())
+        ,   d_len (d_len)
         ,   work_group_size (kernel_calc.local_size[0])
         ,   cl_sum_n_groups ((d_len + work_group_size - 1)/work_group_size)
         ,   cl_d_len (cl_sum_n_groups * work_group_size)
         ,   buff_d (cl_container, CL_MEM_READ_ONLY, d_len)
-        ,   buff_sums (cl_container, CL_MEM_READ_WRITE, cl_d_len)
         ,   buff_best (cl_container, CL_MEM_WRITE_ONLY, 1)
     {
-        kernel_calc.setRange(cl::NDRange(cl_d_len))
+
+        kernel_find.setQueue(1)
+                .arg(d_len)
+                .arg(buff_best)
+                .start()
+                ;
+
+        buff_best.setQueue(1);
+        buff_d.setQueue(0);
+
+        kernel_calc.setRange(cl::NDRange(cl_d_len)).setQueue(0)
                 .arg(buff_d)
                 .arg(d_len)
                 .arg(threshold)
                 .arg(weight)
-                .arg(buff_sums)
-                ;
-
-        kernel_find
-                .arg(buff_sums)
-                .arg(d_len)
-                .arg(buff_best)
                 ;
     }
 
-    unsigned get_best_idx()
+    unsigned get_best_idx(const vector<double> &d)
     {
         cl::Event write_event = buff_d.write(d.data());
         cl::Event calc_event = kernel_calc.start();
-        cl::Event find_event = kernel_find.start();
 
         unsigned best_idx;
         cl::Event read_event = buff_best.read_into(&best_idx);
@@ -220,7 +217,6 @@ public:
 
         std::cout << "write: " << cl_container.durationOfEvent(write_event) << "  ";
         std::cout << "calc: " << cl_container.durationOfEvent(calc_event) << "  ";
-        std::cout << "find: " << cl_container.durationOfEvent(find_event) << "  ";
         std::cout << "read: " << unsigned(cl_container.durationOfEvent(read_event)) << "  ";
         std::cout << std::endl;
 
@@ -231,15 +227,16 @@ public:
 
 double VisualOdometryMono_CL::findBestPlane(const Matrix &x_plane, double threshold, double weight)
 {
-    const double s_pitch = sin(-param.pitch);
-    const double c_pitch = cos(-param.pitch);
+    CLBestPlaneFinder plane_finder(cl_container, x_plane.n, weight, threshold);
+
     vector<double> d (x_plane.n);
 
+    const double s_pitch = sin(-param.pitch);
+    const double c_pitch = cos(-param.pitch);
     for (unsigned i=0; i<d.size(); i++) d[i] = c_pitch*x_plane.val[0][i];
     for (unsigned i=0; i<d.size(); i++) d[i] += s_pitch*x_plane.val[1][i];
 
-    CLBestPlaneFinder plane_finder(cl_container, d, weight, threshold);
-    const unsigned best_idx = plane_finder.get_best_idx();
+    const unsigned best_idx = plane_finder.get_best_idx(d);
     return d[best_idx];
 }
 
