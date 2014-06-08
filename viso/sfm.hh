@@ -32,7 +32,7 @@ public:
 #ifdef __arm__
             cl_container.reset(new OpenCL::FPGAContainer);
 #else
-            cl_container.reset(new OpenCL::GPUContainer);
+            cl_container.reset(new OpenCL::CPUContainer);
 #endif
             cl_container->init(KERNEL_SRCS);
             viso.reset(new VisualOdometryMono_CL(params, *cl_container));
