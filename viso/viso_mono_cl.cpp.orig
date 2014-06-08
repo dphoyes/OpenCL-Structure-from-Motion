@@ -178,24 +178,28 @@ public:
         ,   kernel_calc (cl_container.getKernel("plane_and_inliers.cl", "plane_calc_sums"))
         ,   d_len (d_len)
         ,   buff_d (cl_container, CL_MEM_READ_ONLY, d_len)
+<<<<<<< Updated upstream
+        ,   buff_sums (cl_container, CL_MEM_WRITE_ONLY, d_len)
+=======
         ,   buff_best (cl_container, CL_MEM_WRITE_ONLY, 1)
+>>>>>>> Stashed changes
     {
         kernel_calc
                 .arg(buff_d)
                 .arg(d_len)
                 .arg(threshold)
                 .arg(weight)
-                .arg(buff_best)
+                .arg(buff_sums)
                 ;
     }
 
-    unsigned get_best(const vector<double> &d)
+    std::vector<double> get_sums(const vector<double> &d)
     {
         cl::Event write_event = buff_d.write(d.data());
         cl::Event calc_event = kernel_calc.start();
 
-        unsigned best_idx;
-        cl::Event read_event = buff_best.read_into(&best_idx);
+        std::vector<double> sums (d_len);
+        cl::Event read_event = buff_sums.read_into(sums.data());
         read_event.wait();
 
         std::cout << "write: " << cl_container.durationOfEvent(write_event) << "  ";
@@ -203,7 +207,7 @@ public:
         std::cout << "read: " << unsigned(cl_container.durationOfEvent(read_event)) << "  ";
         std::cout << std::endl;
 
-        return best_idx;
+        return sums;
     }
 };
 
@@ -219,7 +223,20 @@ double VisualOdometryMono_CL::findBestPlane(const Matrix &x_plane, double thresh
     for (unsigned i=0; i<d.size(); i++) d[i] = c_pitch*x_plane.val[0][i];
     for (unsigned i=0; i<d.size(); i++) d[i] += s_pitch*x_plane.val[1][i];
 
-    const unsigned best_idx = plane_finder.get_best(d);
+    const auto dist_sums = plane_finder.get_sums(d);
+
+    double   best_sum = 0;
+    int32_t  best_idx = 0;
+
+    for (unsigned i=0; i<d.size(); i++)
+    {
+        double sum = dist_sums[i];
+        if (sum>best_sum)
+        {
+            best_sum = sum;
+            best_idx = i;
+        }
+    }
     return d[best_idx];
 }
 

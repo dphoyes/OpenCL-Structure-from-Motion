@@ -12,9 +12,12 @@ __kernel void plane_calc_sums(
         const uint d_len,
         const double threshold,
         const double weight,
-        __global double * restrict sums
+        __global uint * restrict return_best_idx
     )
 {
+    double best_sum = 0;
+    uint best_idx = 0;
+
     for (uint j=0; j<d_len; j++)
     {
         const double d_j = d[j];
@@ -34,6 +37,15 @@ __kernel void plane_calc_sums(
 
             sum += sub_sum;
         }
-        sums[j] = active ? sum : 0;
+        if (!active) sum = 0;
+
+        if (sum>best_sum)
+        {
+            best_sum = sum;
+            best_idx = j;
+        }
     }
+
+    *return_best_idx = best_idx;
 }
+
