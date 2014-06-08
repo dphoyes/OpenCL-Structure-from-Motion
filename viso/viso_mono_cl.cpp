@@ -191,6 +191,7 @@ public:
 
         kernel_find.setQueue(1)
                 .arg(d_len)
+                .arg(cl_d_len)
                 .arg(buff_best)
                 .start()
                 ;
