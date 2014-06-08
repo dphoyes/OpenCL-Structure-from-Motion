@@ -8,7 +8,7 @@ class CLInlierFinder
 private:
     OpenCL::Container &cl_container;
 
-    OpenCL::Kernel kernel_get_inlier;
+    OpenCL::Task kernel_get_inlier;
 
     const unsigned n_matches;
     const unsigned iters_per_batch;
@@ -83,7 +83,7 @@ public:
         }
 
         cl::Event write_f_event = buff_fund_mat.write(F_array.data(), update_deps);
-        cl::Event get_inlier_complete_event = kernel_get_inlier.startTask({write_f_event});
+        cl::Event get_inlier_complete_event = kernel_get_inlier.start({write_f_event});
 
         update_deps = {get_inlier_complete_event};
         write_f_event.wait();
@@ -167,7 +167,7 @@ private:
 
     OpenCL::Kernel kernel_calc_dists;
 
-    const Matrix &d;
+    const vector<double> &d;
 
     const unsigned d_len;
     const size_t work_group_size;
@@ -178,11 +178,11 @@ private:
     OpenCL::Buffer<cl_double> buff_sums;
 
 public:
-    CLBestPlaneFinder(OpenCL::Container &cl_container, const Matrix &d, double weight, double threshold)
+    CLBestPlaneFinder(OpenCL::Container &cl_container, const vector<double> &d, double weight, double threshold)
         :   cl_container (cl_container)
         ,   kernel_calc_dists (cl_container.getKernel("plane_and_inliers.cl", "plane_calc_sums"))
         ,   d (d)
-        ,   d_len (d.n)
+        ,   d_len (d.size())
         ,   work_group_size (kernel_calc_dists.local_size[0])
         ,   cl_sum_n_groups ((d_len + work_group_size - 1)/work_group_size)
         ,   cl_d_len (cl_sum_n_groups * work_group_size)
@@ -200,7 +200,7 @@ public:
 
     std::vector<double> get_dist_sums()
     {
-        cl::Event write_event = buff_d.write(&d.val[0][0]);
+        cl::Event write_event = buff_d.write(d.data());
         cl::Event calc_event = kernel_calc_dists.start({write_event});
 
         std::vector<double> sums (cl_d_len);
@@ -217,16 +217,22 @@ public:
 };
 
 
-int32_t VisualOdometryMono_CL::findBestPlane(const Matrix &d, double median, double weight)
+double VisualOdometryMono_CL::findBestPlane(const Matrix &x_plane, double threshold, double weight)
 {
-    const double threshold = median/param.motion_threshold;
+    const double s_pitch = sin(-param.pitch);
+    const double c_pitch = cos(-param.pitch);
+    vector<double> d (x_plane.n);
+
+    for (unsigned i=0; i<d.size(); i++) d[i] = c_pitch*x_plane.val[0][i];
+    for (unsigned i=0; i<d.size(); i++) d[i] += s_pitch*x_plane.val[1][i];
+
     CLBestPlaneFinder plane_finder(cl_container, d, weight, threshold);
     const auto dist_sums = plane_finder.get_dist_sums();
 
     double   best_sum = 0;
     int32_t  best_idx = 0;
 
-    for (int32_t i=0; i<d.n; i++)
+    for (unsigned i=0; i<d.size(); i++)
     {
         double sum = dist_sums[i];
         if (sum>best_sum)
@@ -235,6 +241,6 @@ int32_t VisualOdometryMono_CL::findBestPlane(const Matrix &d, double median, dou
             best_idx = i;
         }
     }
-    return best_idx;
+    return d[best_idx];
 }
 

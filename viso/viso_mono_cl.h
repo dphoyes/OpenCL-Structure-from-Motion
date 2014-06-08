@@ -11,7 +11,7 @@ private:
     OpenCL::Container &cl_container;
 
     Matrix ransacEstimateF_disabled(const std::vector<Matcher::p_match> &p_matched);
-    int32_t findBestPlane(const Matrix &d, double median, double weight) override;
+    double findBestPlane(const Matrix &x_plane, double threshold, double weight) override;
 
 public:
     VisualOdometryMono_CL (parameters param, OpenCL::Container &cl_container)
