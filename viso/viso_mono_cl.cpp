@@ -165,14 +165,11 @@ class CLBestPlaneFinder
 private:
     OpenCL::Container &cl_container;
 
-    OpenCL::Kernel kernel_calc_dists;
+    OpenCL::Task kernel_calc_dists;
 
     const vector<double> &d;
 
     const unsigned d_len;
-    const size_t work_group_size;
-    const size_t cl_sum_n_groups;
-    const size_t cl_d_len;
 
     OpenCL::Buffer<cl_double> buff_d;
     OpenCL::Buffer<cl_double> buff_sums;
@@ -183,13 +180,10 @@ public:
         ,   kernel_calc_dists (cl_container.getKernel("plane_and_inliers.cl", "plane_calc_sums"))
         ,   d (d)
         ,   d_len (d.size())
-        ,   work_group_size (kernel_calc_dists.local_size[0])
-        ,   cl_sum_n_groups ((d_len + work_group_size - 1)/work_group_size)
-        ,   cl_d_len (cl_sum_n_groups * work_group_size)
         ,   buff_d (cl_container, CL_MEM_READ_ONLY, d_len)
-        ,   buff_sums (cl_container, CL_MEM_WRITE_ONLY, cl_d_len)
+        ,   buff_sums (cl_container, CL_MEM_WRITE_ONLY, d_len)
     {
-        kernel_calc_dists.setRange(cl::NDRange(cl_d_len))
+        kernel_calc_dists
                 .arg(buff_d)
                 .arg(d_len)
                 .arg(threshold)
@@ -203,7 +197,7 @@ public:
         cl::Event write_event = buff_d.write(d.data());
         cl::Event calc_event = kernel_calc_dists.start({write_event});
 
-        std::vector<double> sums (cl_d_len);
+        std::vector<double> sums (d_len);
         cl::Event read_event = buff_sums.read_into(sums.data(), {calc_event});
         read_event.wait();
 
