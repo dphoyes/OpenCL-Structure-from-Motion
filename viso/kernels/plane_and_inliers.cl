@@ -15,8 +15,7 @@ __kernel void plane_calc_sums(
         __global uint * restrict return_best_idx
     )
 {
-    double best_sum = 0;
-    uint best_idx = 0;
+    double sums[5000];
 
     for (uint j=0; j<d_len; j++)
     {
@@ -37,15 +36,19 @@ __kernel void plane_calc_sums(
 
             sum += sub_sum;
         }
-        if (!active) sum = 0;
+        sums[j] = active ? sum : 0;
+    }
 
+    double best_sum = 0;
+    uint best_idx = 0;
+    for (uint j=0; j<d_len; j++)
+    {
+        double sum = sums[j];
         if (sum>best_sum)
         {
             best_sum = sum;
             best_idx = j;
-        }
+        }        
     }
-
     *return_best_idx = best_idx;
 }
-
