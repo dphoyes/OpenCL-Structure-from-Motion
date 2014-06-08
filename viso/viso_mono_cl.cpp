@@ -167,18 +167,18 @@ private:
 
     OpenCL::Kernel kernel_calc_dists;
 
-    const vector<double> &d;
+    const vector<float> &d;
 
     const unsigned d_len;
     const size_t work_group_size;
     const size_t cl_sum_n_groups;
     const size_t cl_d_len;
 
-    OpenCL::Buffer<cl_double> buff_d;
-    OpenCL::Buffer<cl_double> buff_sums;
+    OpenCL::Buffer<cl_float> buff_d;
+    OpenCL::Buffer<cl_float> buff_sums;
 
 public:
-    CLBestPlaneFinder(OpenCL::Container &cl_container, const vector<double> &d, double weight, double threshold)
+    CLBestPlaneFinder(OpenCL::Container &cl_container, const vector<float> &d, float weight, float threshold)
         :   cl_container (cl_container)
         ,   kernel_calc_dists (cl_container.getKernel("plane_and_inliers.cl", "plane_calc_sums"))
         ,   d (d)
@@ -198,12 +198,12 @@ public:
                 ;
     }
 
-    std::vector<double> get_dist_sums()
+    std::vector<float> get_dist_sums()
     {
         cl::Event write_event = buff_d.write(d.data());
         cl::Event calc_event = kernel_calc_dists.start({write_event});
 
-        std::vector<double> sums (cl_d_len);
+        std::vector<float> sums (cl_d_len);
         cl::Event read_event = buff_sums.read_into(sums.data(), {calc_event});
         read_event.wait();
 
@@ -221,7 +221,7 @@ double VisualOdometryMono_CL::findBestPlane(const Matrix &x_plane, double thresh
 {
     const double s_pitch = sin(-param.pitch);
     const double c_pitch = cos(-param.pitch);
-    vector<double> d (x_plane.n);
+    vector<float> d (x_plane.n);
 
     for (unsigned i=0; i<d.size(); i++) d[i] = c_pitch*x_plane.val[0][i];
     for (unsigned i=0; i<d.size(); i++) d[i] += s_pitch*x_plane.val[1][i];
@@ -229,12 +229,12 @@ double VisualOdometryMono_CL::findBestPlane(const Matrix &x_plane, double thresh
     CLBestPlaneFinder plane_finder(cl_container, d, weight, threshold);
     const auto dist_sums = plane_finder.get_dist_sums();
 
-    double   best_sum = 0;
+    float   best_sum = 0;
     int32_t  best_idx = 0;
 
     for (unsigned i=0; i<d.size(); i++)
     {
-        double sum = dist_sums[i];
+        float sum = dist_sums[i];
         if (sum>best_sum)
         {
             best_sum = sum;
