@@ -1,6 +1,6 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 #define WORK_GROUP_SIZE 128
-#define SIMD_WIDTH 4
+#define SIMD_WIDTH 2
 
 
 __attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
