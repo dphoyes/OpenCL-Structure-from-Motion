@@ -33,3 +33,30 @@ __kernel void plane_calc_sums(
     }
     sums[gid0] = active ? sum : 0;
 }
+
+
+#ifdef ALTERA_CL
+ __attribute__((task))
+#endif
+__attribute__((reqd_work_group_size(1, 1, 1)))
+__kernel void find_best_idx(
+        __global const double * restrict sums,
+        const uint d_len,
+        __global uint * restrict return_best_idx
+    )
+{
+    double best_sum = 0;
+    uint best_idx = 0;
+
+    for (uint i=0; i<d_len; i++)
+    {
+        const double sum = sums[i];
+        if (sum > best_sum)
+        {
+            best_sum = sum;
+            best_idx = i;
+        }
+    }
+
+    *return_best_idx = best_idx;
+}
