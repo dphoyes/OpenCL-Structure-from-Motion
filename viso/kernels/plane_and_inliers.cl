@@ -7,14 +7,17 @@
  __attribute__((task))
 #endif
 __attribute__((reqd_work_group_size(1, 1, 1)))
-__kernel void plane_calc_sums(
+__kernel void plane_find_best_idx(
         __global const double * restrict d,
         const uint d_len,
         const double threshold,
         const double weight,
-        __global double * restrict sums
+        __global uint * restrict return_best_idx
     )
 {
+    double best_sum = 0;
+    uint best_idx = 0;
+
     for (uint j=0; j<d_len; j++)
     {
         const double d_j = d[j];
@@ -34,6 +37,14 @@ __kernel void plane_calc_sums(
 
             sum += sub_sum;
         }
-        sums[j] = active ? sum : 0;
+        if (!active) sum = 0;
+
+        if (sum>best_sum)
+        {
+            best_sum = sum;
+            best_idx = j;
+        }
     }
+
+    *return_best_idx = best_idx;
 }
