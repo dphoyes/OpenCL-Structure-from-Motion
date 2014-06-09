@@ -1,6 +1,6 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 #define WORK_GROUP_SIZE 128
-#define simd_type double
+#define simd_type double2
 #define SIMD_WIDTH (sizeof(simd_type)/sizeof(double))
 
 
@@ -26,7 +26,7 @@ __kernel void plane_calc_sums(
         #pragma unroll
         for (uint s=0; s<SIMD_WIDTH; s++)
         {
-            sub_sum += (i+s < d_len) ? val : 0;
+            sub_sum += (i+s < d_len) ? val[s] : 0;
         }
 
         sum += sub_sum;
