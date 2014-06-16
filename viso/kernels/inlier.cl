@@ -21,30 +21,30 @@ __kernel void kernel_xy(
     uint x = get_global_id(0);
 
     // extract fundamental matrix
-    double f00 = fund_mat[0*3+0]; double f01 = fund_mat[0*3+1]; double f02 = fund_mat[0*3+2];
-    double f10 = fund_mat[1*3+0]; double f11 = fund_mat[1*3+1]; double f12 = fund_mat[1*3+2];
-    double f20 = fund_mat[2*3+0]; double f21 = fund_mat[2*3+1]; double f22 = fund_mat[2*3+2];
+    float f00 = fund_mat[0*3+0]; float f01 = fund_mat[0*3+1]; float f02 = fund_mat[0*3+2];
+    float f10 = fund_mat[1*3+0]; float f11 = fund_mat[1*3+1]; float f12 = fund_mat[1*3+2];
+    float f20 = fund_mat[2*3+0]; float f21 = fund_mat[2*3+1]; float f22 = fund_mat[2*3+2];
 
     // extract matches
-    double u1 = p_matched[x].u1p;
-    double v1 = p_matched[x].v1p;
-    double u2 = p_matched[x].u1c;
-    double v2 = p_matched[x].v1c;
+    float u1 = p_matched[x].u1p;
+    float v1 = p_matched[x].v1p;
+    float u2 = p_matched[x].u1c;
+    float v2 = p_matched[x].v1c;
 
     // F*x1
-    double Fx1u = f00*u1+f01*v1+f02;
-    double Fx1v = f10*u1+f11*v1+f12;
-    double Fx1w = f20*u1+f21*v1+f22;
+    float Fx1u = f00*u1+f01*v1+f02;
+    float Fx1v = f10*u1+f11*v1+f12;
+    float Fx1w = f20*u1+f21*v1+f22;
 
     // F'*x2
-    double Ftx2u = f00*u2+f10*v2+f20;
-    double Ftx2v = f01*u2+f11*v2+f21;
+    float Ftx2u = f00*u2+f10*v2+f20;
+    float Ftx2v = f01*u2+f11*v2+f21;
 
     // x2'*F*x1
-    double x2tFx1 = u2*Fx1u+v2*Fx1v+Fx1w;
+    float x2tFx1 = u2*Fx1u+v2*Fx1v+Fx1w;
 
     // sampson distance
-    double d = x2tFx1*x2tFx1 / (Fx1u*Fx1u+Fx1v*Fx1v+Ftx2u*Ftx2u+Ftx2v*Ftx2v);
+    float d = x2tFx1*x2tFx1 / (Fx1u*Fx1u+Fx1v*Fx1v+Ftx2u*Ftx2u+Ftx2v*Ftx2v);
 
     // check threshold
     inlier_mask[x] = fabs(d)<thresh ? 1 : -1;
