@@ -99,6 +99,8 @@ public:
     Container &cl_container;
     cl::Kernel kernel;
 
+    cl::size_t<3> reqd_local_size;
+
     cl::NDRange offset;
     cl::NDRange global_size;
     cl::NDRange local_size;
@@ -127,7 +129,7 @@ public:
     template<typename T> __attribute__((always_inline)) Kernel& arg(Buffer<T> &val)               {return arg(val.buff);}
     template<typename T> __attribute__((always_inline)) Kernel& arg(unsigned id, Buffer<T> &val)  {return arg(id, val.buff);}
 
-    Kernel& setRanges(const size_t global, const size_t local, const size_t offset = 0);
+    Kernel& setRange(const cl::NDRange &global);
 };
 
 

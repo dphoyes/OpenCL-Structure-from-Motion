@@ -1,15 +1,16 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 
-__kernel void find_inliers(
-        __global const float *match_u1p,
-        __global const float *match_v1p,
-        __global const float *match_u1c,
-        __global const float *match_v1c,
+__kernel __attribute__((reqd_work_group_size(128, 1, 1)))
+void find_inliers(
+        __global const float * restrict match_u1p,
+        __global const float * restrict match_v1p,
+        __global const float * restrict match_u1c,
+        __global const float * restrict match_v1c,
         const uint p_matched_size,
         const uint work_items_per_F,
         const float thresh,
-        __global const double *fund_mat,
-        __global uchar *inlier_mask
+        __global const double * restrict fund_mat,
+        __global uchar * restrict inlier_mask
     )
 {
     __local float f[9];
@@ -56,12 +57,13 @@ __kernel void find_inliers(
     }
 }
 
-__kernel void sum(
-        __global const uchar *in,
-        __global ushort *out,
+__kernel __attribute__((reqd_work_group_size(128, 1, 1)))
+void sum(
+        __global const uchar * restrict in,
+        __global ushort * restrict out,
         const uint iter_len,
         const uint batch_width,
-        __local ushort *tmp
+        __local ushort * restrict tmp
     )
 {
     const size_t iter_id = get_group_id(0);
@@ -93,15 +95,15 @@ __kernel void sum(
     }
 }
 
-__kernel void update_best_inliers(
-        __global const uchar *inliers,
-        __global const ushort *counts,
+__kernel __attribute__((reqd_work_group_size(128, 1, 1)))
+void update_best_inliers(
+        __global const uchar * restrict inliers,
+        __global const ushort * restrict counts,
         const uint iters_per_batch,
         const uint p_matched_size,
         const uint batch_width,
-        __global uchar *best_inliers,
-        __global ushort *local_best_count,
-        __local ushort *tmp
+        __global uchar * restrict best_inliers,
+        __global ushort * restrict local_best_count
     )
 {
     ushort best_count = local_best_count[get_group_id(0)];

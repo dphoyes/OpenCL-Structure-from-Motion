@@ -13,7 +13,7 @@ private:
 
     const unsigned n_matches;
     const unsigned iters_per_batch;
-    const size_t work_group_size = 128;
+    const size_t work_group_size;
     const size_t cl_groups_per_iter;
     const size_t cl_n_matches;
 
@@ -56,6 +56,7 @@ public:
         ,   kernel_update_inliers (cl_container.getKernel("inlier.cl", "update_best_inliers"))
         ,   n_matches (p_matched.size())
         ,   iters_per_batch (iters_per_batch)
+        ,   work_group_size (kernel_get_inlier.local_size[0])
         ,   cl_groups_per_iter ((n_matches + work_group_size - 1)/work_group_size)
         ,   cl_n_matches (cl_groups_per_iter * work_group_size)
         ,   buff_match_u1p (cl_container, CL_MEM_READ_ONLY, n_matches)
@@ -79,7 +80,7 @@ public:
         update_deps.push_back( buff_match_v1c.write(match_v1c.data()) );
         update_deps.push_back( buff_best_count.write(zeros.data()) );
 
-        kernel_get_inlier.setRanges(iters_per_batch*cl_n_matches, work_group_size)
+        kernel_get_inlier.setRange(cl::NDRange(iters_per_batch*cl_n_matches))
                 .arg(buff_match_u1p)
                 .arg(buff_match_v1p)
                 .arg(buff_match_u1c)
@@ -91,7 +92,7 @@ public:
                 .arg(buff_inlier_mask)
                 ;
 
-        kernel_sum.setRanges(iters_per_batch*work_group_size, work_group_size)
+        kernel_sum.setRange(cl::NDRange(iters_per_batch*work_group_size))
                 .arg(buff_inlier_mask)
                 .arg(buff_counts)
                 .arg(cl_uint(n_matches))
@@ -99,7 +100,7 @@ public:
                 .arg(cl::__local(work_group_size*sizeof(cl_ushort)))
                 ;
 
-        kernel_update_inliers.setRanges(cl_n_matches, work_group_size)
+        kernel_update_inliers.setRange(cl::NDRange(cl_n_matches))
                 .arg(buff_inlier_mask)
                 .arg(buff_counts)
                 .arg(cl_uint(iters_per_batch))
@@ -107,7 +108,7 @@ public:
                 .arg(cl_uint(cl_n_matches))
                 .arg(buff_best_inlier_mask)
                 .arg(buff_best_count)
-                .arg(cl::__local(work_group_size*sizeof(cl_ushort)))
+//                .arg(cl::__local(work_group_size*sizeof(cl_ushort)))
                 ;
     }
 

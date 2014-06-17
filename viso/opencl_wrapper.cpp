@@ -11,6 +11,8 @@ namespace OpenCL
 Kernel::Kernel(Container &cl_container, const cl::Program& program, const char* name)
     :   cl_container (cl_container)
     ,   kernel (program, name)
+    ,   reqd_local_size (kernel.getWorkGroupInfo<CL_KERNEL_COMPILE_WORK_GROUP_SIZE>(cl_container.device))
+    ,   local_size (reqd_local_size[0])
 {}
 
 cl::Event Kernel::start(const std::vector<cl::Event> &deps)
@@ -20,11 +22,9 @@ cl::Event Kernel::start(const std::vector<cl::Event> &deps)
     return ev;
 }
 
-Kernel& Kernel::setRanges(const size_t global, const size_t local, const size_t offset)
+Kernel& Kernel::setRange(const cl::NDRange &global)
 {
-    this->offset = cl::NDRange(offset);
-    this->global_size = cl::NDRange(global);
-    this->local_size = cl::NDRange(local);
+    this->global_size = global;
     return *this;
 }
 
@@ -109,7 +109,6 @@ void Container::getDevice()
     {
         throw std::runtime_error("No device found.\n");
     }
-    std::cout << "CL_DEVICE_MAX_WORK_GROUP_SIZE: " << device.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() << std::endl;
 }
 
 void Container::makeProgram(const std::string &program_name, const std::string &program_source)
