@@ -150,7 +150,7 @@ public:
 
 };
 
-Matrix VisualOdometryMono_CL::ransacEstimateF_disabled(const vector<Matcher::p_match> &p_matched)
+Matrix VisualOdometryMono_CL::ransacEstimateF(const vector<Matcher::p_match> &p_matched)
 {
 #ifdef __arm__
     static const unsigned iters_per_batch = 2048;
