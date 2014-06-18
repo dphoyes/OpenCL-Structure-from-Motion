@@ -1,7 +1,5 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 #define WORK_GROUP_SIZE 128
-#define simd_type float4
-#define SIMD_WIDTH (sizeof(simd_type)/sizeof(float))
 
 struct match_t
 {
@@ -154,17 +152,11 @@ __kernel void plane_calc_sums(
     const float d_gid0 = d[gid0];
     const bool active = d_gid0 > threshold;
     float sum = 0;
-    for (uint i=0, ii=0; i<d_len; i+=SIMD_WIDTH, ii++)
+    for (uint i=0; i<d_len; i++)
     {
-        const simd_type dist = d_gid0 - ((global const simd_type*)(d))[ii];
-        const simd_type val = exp(-dist*dist*weight);
-
-        float sub_sum = val.s0;
-        sub_sum += (i+1 < d_len) ? val.s1 : 0;
-        sub_sum += (i+2 < d_len) ? val.s2 : 0;
-        sub_sum += (i+3 < d_len) ? val.s3 : 0;
-
-        sum += sub_sum;
+        const float dist = d_gid0 - d[i];
+        const float val = exp(-dist*dist*weight);
+        sum += val;
     }
     sums[gid0] = active ? sum : 0;
 }
