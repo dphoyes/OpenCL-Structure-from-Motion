@@ -252,7 +252,7 @@ public:
 };
 
 
-double VisualOdometryMono_CL::findBestPlane_disabled(const Matrix &x_plane, double threshold, double weight)
+double VisualOdometryMono_CL::findBestPlane(const Matrix &x_plane, double threshold, double weight)
 {
     const double s_pitch = sin(-param.pitch);
     const double c_pitch = cos(-param.pitch);
