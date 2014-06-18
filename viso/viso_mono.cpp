@@ -71,6 +71,32 @@ Matrix VisualOdometryMono::ransacEstimateF(const vector<Matcher::p_match> &p_mat
     return F;
 }
 
+double VisualOdometryMono::findBestPlane(const Matrix &x_plane, double threshold, double weight)
+{
+    Matrix n(2,1);
+    n.val[0][0]       = cos(-param.pitch);
+    n.val[1][0]       = sin(-param.pitch);
+    Matrix   d        = ~n*x_plane;
+
+    double   best_sum = 0;
+    int32_t  best_idx = 0;
+
+    for (int32_t i=0; i<d.n; i++) {
+      if (d.val[0][i]>threshold) {
+        double sum = 0;
+        for (int32_t j=0; j<d.n; j++) {
+          double dist = d.val[0][j]-d.val[0][i];
+          sum += exp(-dist*dist*weight);
+        }
+        if (sum>best_sum) {
+          best_sum = sum;
+          best_idx = i;
+        }
+      }
+    }
+    return d.val[0][best_idx];
+}
+
 vector<double> VisualOdometryMono::estimateMotion (vector<Matcher::p_match> p_matched) {
 
   // get number of matches
@@ -90,6 +116,7 @@ vector<double> VisualOdometryMono::estimateMotion (vector<Matcher::p_match> p_ma
 
   StartTimer estimate_f_timer("Estimate F time");
 
+  // estimate F using RANSAC
   Matrix F = ransacEstimateF(p_matched_normalized);
   if (F.val == nullptr) return vector<double>();
 
@@ -135,30 +162,13 @@ vector<double> VisualOdometryMono::estimateMotion (vector<Matcher::p_match> p_ma
 
   StartTimer best_plane_timer("Best plane time");
   
-  Matrix n(2,1);
-  n.val[0][0]       = cos(-param.pitch);
-  n.val[1][0]       = sin(-param.pitch);
-  Matrix   d        = ~n*x_plane;
-  double   sigma    = median/50.0;
-  double   weight   = 1.0/(2.0*sigma*sigma);
-  double   best_sum = 0;
-  int32_t  best_idx = 0;
+  double sigma     = median/50.0;
+  double weight    = 1.0/(2.0*sigma*sigma);
+  double threshold = median/param.motion_threshold;
 
   // find best plane
-  for (int32_t i=0; i<x_plane.n; i++) {
-    if (d.val[0][i]>median/param.motion_threshold) {
-      double sum = 0;
-      for (int32_t j=0; j<x_plane.n; j++) {
-        double dist = d.val[0][j]-d.val[0][i];
-        sum += exp(-dist*dist*weight);
-      }
-      if (sum>best_sum) {
-        best_sum = sum;
-        best_idx = i;
-      }
-    }
-  }
-  t = t*param.height/d.val[0][best_idx];
+  double best_d = findBestPlane(x_plane, threshold, weight);
+  t = t*param.height/best_d;
 
   best_plane_timer.end();
   

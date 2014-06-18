@@ -18,13 +18,29 @@ Kernel::Kernel(Container &cl_container, const cl::Program& program, const char* 
 cl::Event Kernel::start(const std::vector<cl::Event> &deps)
 {
     cl::Event ev;
-    cl_container.queue.enqueueNDRangeKernel(kernel, offset, global_size, local_size, &deps, &ev);
+    cl_container.queues[queue_id].enqueueNDRangeKernel(kernel, offset, global_size, local_size, &deps, &ev);
+    return ev;
+}
+
+cl::Event Task::start(const std::vector<cl::Event> &deps)
+{
+    cl::Event ev;
+    cl_container.queues[queue_id].enqueueTask(kernel, &deps, &ev);
     return ev;
 }
 
 Kernel& Kernel::setRange(const cl::NDRange &global)
 {
     this->global_size = global;
+    if (global.dimensions() == 1) this->local_size = cl::NDRange(reqd_local_size[0]);
+    if (global.dimensions() == 2) this->local_size = cl::NDRange(reqd_local_size[0], reqd_local_size[1]);
+    if (global.dimensions() == 3) this->local_size = cl::NDRange(reqd_local_size[0], reqd_local_size[1], reqd_local_size[2]);
+    return *this;
+}
+
+Kernel& Kernel::setQueue(const unsigned id)
+{
+    queue_id = id;
     return *this;
 }
 
@@ -46,31 +62,6 @@ FPGAContainer::FPGAContainer() : Container (CL_DEVICE_TYPE_ACCELERATOR,  2048,  
 
 Container::Container(const Container &c) { throw std::runtime_error("OpenCL::Container copy not defined\n"); }
 
-void Container::init(const std::unordered_map<std::string,std::string> &program_srcs)
-{
-    getDevice();
-
-    context = cl::Context(devices);
-    queue = cl::CommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE);
-
-    for (auto &prog_src: program_srcs)
-    {
-        makeProgram(prog_src.first, prog_src.second);
-    }
-}
-
-void Container::init(const std::unordered_map<std::string, std::vector<unsigned char>> &program_binaries)
-{
-    getDevice();
-
-    context = cl::Context(devices);
-    queue = cl::CommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE);
-
-    for (auto &prog_bin: program_binaries)
-    {
-        makeProgram(prog_bin.first, prog_bin.second);
-    }
-}
 
 void Container::getDevice()
 {

@@ -1,13 +1,21 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
+#define WORK_GROUP_SIZE 128
+#define simd_type float4
+#define SIMD_WIDTH (sizeof(simd_type)/sizeof(float))
 
-__kernel __attribute__((reqd_work_group_size(128, 1, 1)))
+struct match_t
+{
+    float u1p;
+    float v1p;
+    float u1c;
+    float v1c;
+};
+
+__kernel __attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
 void find_inliers(
-        __global const float * restrict match_u1p,
-        __global const float * restrict match_v1p,
-        __global const float * restrict match_u1c,
-        __global const float * restrict match_v1c,
         const uint p_matched_size,
         const uint work_items_per_F,
+        __global const struct match_t * restrict matches,
         const float thresh,
         __global const double * restrict fund_mat,
         __global uchar * restrict inlier_mask
@@ -32,10 +40,11 @@ void find_inliers(
         float f20 = f[6]; float f21 = f[7]; float f22 = f[8];
 
         // extract matches
-        float u1 = match_u1p[sub_iter_id];
-        float v1 = match_v1p[sub_iter_id];
-        float u2 = match_u1c[sub_iter_id];
-        float v2 = match_v1c[sub_iter_id];
+        struct match_t match = matches[sub_iter_id];
+        float u1 = match.u1p;
+        float v1 = match.v1p;
+        float u2 = match.u1c;
+        float v2 = match.v1c;
 
         // F*x1
         float Fx1u = f00*u1+f01*v1+f02;
@@ -57,7 +66,7 @@ void find_inliers(
     }
 }
 
-__kernel __attribute__((reqd_work_group_size(128, 1, 1)))
+__kernel __attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
 void sum(
         __global const uchar * restrict in,
         __global ushort * restrict out,
@@ -95,7 +104,7 @@ void sum(
     }
 }
 
-__kernel __attribute__((reqd_work_group_size(128, 1, 1)))
+__kernel __attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
 void update_best_inliers(
         __global const uchar * restrict inliers,
         __global const ushort * restrict counts,
@@ -130,3 +139,33 @@ void update_best_inliers(
         }
     }
 }
+
+
+__attribute__((reqd_work_group_size(WORK_GROUP_SIZE, 1, 1)))
+__kernel void plane_calc_sums(
+        __global const float * restrict d,
+        const uint d_len,
+        const float threshold,
+        const float weight,
+        __global float * restrict sums
+    )
+{
+    const uint gid0 = get_global_id(0);
+    const float d_gid0 = d[gid0];
+    const bool active = d_gid0 > threshold;
+    float sum = 0;
+    for (uint i=0, ii=0; i<d_len; i+=SIMD_WIDTH, ii++)
+    {
+        const simd_type dist = d_gid0 - ((global const simd_type*)(d))[ii];
+        const simd_type val = exp(-dist*dist*weight);
+
+        float sub_sum = val.s0;
+        sub_sum += (i+1 < d_len) ? val.s1 : 0;
+        sub_sum += (i+2 < d_len) ? val.s2 : 0;
+        sub_sum += (i+3 < d_len) ? val.s3 : 0;
+
+        sum += sub_sum;
+    }
+    sums[gid0] = active ? sum : 0;
+}
+
